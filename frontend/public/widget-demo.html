@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aurora Outfitters — sample storefront with Relay</title>
+    <style>
+      body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #0f172a; background: #f8fafc; }
+      header { display: flex; align-items: center; justify-content: space-between; padding: 18px 32px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+      header b { font-size: 18px; letter-spacing: -0.02em; }
+      nav a { margin-left: 20px; color: #475569; text-decoration: none; font-size: 14px; }
+      .hero { padding: 72px 32px; background: linear-gradient(135deg, #0b3b2e, #14532d); color: #fff; }
+      .hero h1 { margin: 0; font-size: clamp(32px, 5vw, 54px); letter-spacing: -0.03em; max-width: 720px; }
+      .hero p { color: #bbf7d0; max-width: 520px; font-size: 18px; }
+      .hero button { margin-top: 12px; padding: 12px 20px; border: 0; border-radius: 10px; background: #fff; color: #14532d; font-weight: 600; cursor: pointer; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 40px 32px; max-width: 1100px; margin: 0 auto; }
+      .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; }
+      .img { height: 140px; border-radius: 10px; background: linear-gradient(160deg, #e2e8f0, #cbd5e1); margin-bottom: 12px; }
+      .note { max-width: 1100px; margin: 0 auto 60px; padding: 0 32px; font-size: 13px; color: #64748b; }
+      code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <b>Aurora Outfitters</b>
+      <nav><a href="#">Camp</a><a href="#">Hike</a><a href="#">Paddle</a><a href="#" onclick="window.Relay && window.Relay.open(); return false;">Help</a></nav>
+    </header>
+    <section class="hero">
+      <h1>Gear for the long way round.</h1>
+      <p>Tents, packs and layers built for real weather. Questions about an order? Our assistant answers instantly.</p>
+      <button onclick="window.Relay && window.Relay.open()">Chat with support</button>
+    </section>
+    <section class="grid">
+      <div class="card"><div class="img"></div><b>Ridgeline 2P Tent</b><p>$349</p></div>
+      <div class="card"><div class="img"></div><b>Northlight Down Jacket</b><p>$229</p></div>
+      <div class="card"><div class="img"></div><b>Summit 65L Backpack</b><p>$279</p></div>
+      <div class="card"><div class="img"></div><b>Drift 10ft Kayak</b><p>$899</p></div>
+    </section>
+    <p class="note">
+      This page is a plain HTML file. The chat bubble comes from one tag: <code>&lt;script src="/widget.js" data-customer-id="CUST-001" async&gt;&lt;/script&gt;</code>
+      (signed in as the demo customer Maya Chen).
+    </p>
+    <script src="/widget.js" data-customer-id="CUST-001" async></script>
+  </body>
+</html>

@@ -1,0 +1,404 @@
+[
+  {
+    "id": "ORD-10421",
+    "customer_id": "CUST-001",
+    "placed_at": "2026-09-12",
+    "status": "shipped",
+    "items": [
+      {
+        "sku": "TENT-2P",
+        "name": "Aurora Ridgeline 2P Tent",
+        "qty": 1,
+        "unit_price": 349.0
+      },
+      {
+        "sku": "STOVE-C",
+        "name": "Compact Canister Stove",
+        "qty": 1,
+        "unit_price": 59.0
+      }
+    ],
+    "subtotal": 408.0,
+    "shipping_cost": 0.0,
+    "tax": 29.58,
+    "total": 437.58,
+    "shipping_method": "Expedited",
+    "payment_method": "PayPal",
+    "carrier": "UPS",
+    "tracking_number": "1Z5071050724",
+    "shipped_at": "2026-09-13",
+    "estimated_delivery": "2026-09-16",
+    "delivered_at": null,
+    "events": [
+      {
+        "date": "2026-09-13",
+        "description": "Shipped from Reno, NV"
+      },
+      {
+        "date": "2026-09-14",
+        "description": "In transit — Sacramento, CA"
+      }
+    ]
+  },
+  {
+    "id": "ORD-10388",
+    "customer_id": "CUST-001",
+    "placed_at": "2026-08-06",
+    "status": "delivered",
+    "items": [
+      {
+        "sku": "JKT-DOWN",
+        "name": "Northlight Down Jacket",
+        "qty": 1,
+        "unit_price": 229.0
+      },
+      {
+        "sku": "BASE-MW",
+        "name": "Merino Midweight Base Layer",
+        "qty": 2,
+        "unit_price": 89.0
+      }
+    ],
+    "subtotal": 407.0,
+    "shipping_cost": 0.0,
+    "tax": 29.51,
+    "total": 436.51,
+    "shipping_method": "Standard",
+    "payment_method": "Apple Pay",
+    "carrier": "UPS",
+    "tracking_number": "1Z3795742288",
+    "shipped_at": "2026-08-07",
+    "estimated_delivery": "2026-08-13",
+    "delivered_at": "2026-08-13",
+    "events": []
+  },
+  {
+    "id": "ORD-10102",
+    "customer_id": "CUST-001",
+    "placed_at": "2026-04-18",
+    "status": "delivered",
+    "items": [
+      {
+        "sku": "PACK-65",
+        "name": "Summit 65L Backpack",
+        "qty": 1,
+        "unit_price": 279.0
+      }
+    ],
+    "subtotal": 279.0,
+    "shipping_cost": 0.0,
+    "tax": 20.23,
+    "total": 299.23,
+    "shipping_method": "Standard",
+    "payment_method": "Visa •••• 4242",
+    "carrier": "UPS",
+    "tracking_number": "1Z5699252753",
+    "shipped_at": "2026-04-19",
+    "estimated_delivery": "2026-04-25",
+    "delivered_at": "2026-04-24",
+    "events": []
+  },
+  {
+    "id": "ORD-10455",
+    "customer_id": "CUST-002",
+    "placed_at": "2026-09-14",
+    "status": "processing",
+    "items": [
+      {
+        "sku": "BOOT-HK",
+        "name": "Trailhead Waterproof Hiking Boots",
+        "qty": 1,
+        "unit_price": 179.0
+      },
+      {
+        "sku": "HEAD-300",
+        "name": "Beacon 300 Headlamp",
+        "qty": 1,
+        "unit_price": 39.95
+      }
+    ],
+    "subtotal": 218.95,
+    "shipping_cost": 0.0,
+    "tax": 15.87,
+    "total": 234.82,
+    "shipping_method": "Standard",
+    "payment_method": "Visa •••• 4242",
+    "carrier": null,
+    "tracking_number": null,
+    "shipped_at": null,
+    "estimated_delivery": null,
+    "delivered_at": null,
+    "events": []
+  },
+  {
+    "id": "ORD-10397",
+    "customer_id": "CUST-002",
+    "placed_at": "2026-08-28",
+    "status": "delayed",
+    "items": [
+      {
+        "sku": "POLE-CF",
+        "name": "Carbon Trekking Poles (pair)",
+        "qty": 1,
+        "unit_price": 149.0
+      },
+      {
+        "sku": "BOTTLE",
+        "name": "Insulated 32oz Bottle",
+        "qty": 2,
+        "unit_price": 34.95
+      }
+    ],
+    "subtotal": 218.9,
+    "shipping_cost": 0.0,
+    "tax": 15.87,
+    "total": 234.77,
+    "shipping_method": "Standard",
+    "payment_method": "Mastercard •••• 5510",
+    "carrier": "USPS",
+    "tracking_number": "94001161042648",
+    "shipped_at": "2026-08-29",
+    "estimated_delivery": "2026-09-04",
+    "delivered_at": null,
+    "events": [
+      {
+        "date": "2026-08-29",
+        "description": "Shipped from Columbus, OH"
+      },
+      {
+        "date": "2026-08-31",
+        "description": "Arrived at USPS regional facility — Denver, CO"
+      },
+      {
+        "date": "2026-08-31",
+        "description": "No further updates from carrier"
+      }
+    ]
+  },
+  {
+    "id": "ORD-10350",
+    "customer_id": "CUST-003",
+    "placed_at": "2026-09-03",
+    "status": "delivered",
+    "items": [
+      {
+        "sku": "BAG-20F",
+        "name": "Glacier 20°F Down Sleeping Bag",
+        "qty": 1,
+        "unit_price": 319.0
+      },
+      {
+        "sku": "KAYAK-10",
+        "name": "Drift 10ft Recreational Kayak",
+        "qty": 1,
+        "unit_price": 799.0
+      }
+    ],
+    "subtotal": 1118.0,
+    "shipping_cost": 49.0,
+    "tax": 81.05,
+    "total": 1248.05,
+    "shipping_method": "Freight",
+    "payment_method": "Apple Pay",
+    "carrier": "FedEx Freight",
+    "tracking_number": "94002796035739",
+    "shipped_at": "2026-09-04",
+    "estimated_delivery": "2026-09-16",
+    "delivered_at": "2026-09-11",
+    "events": []
+  },
+  {
+    "id": "ORD-10412",
+    "customer_id": "CUST-003",
+    "placed_at": "2026-09-09",
+    "status": "return_in_progress",
+    "items": [
+      {
+        "sku": "JKT-DOWN",
+        "name": "Northlight Down Jacket",
+        "qty": 1,
+        "unit_price": 229.0
+      }
+    ],
+    "subtotal": 229.0,
+    "shipping_cost": 0.0,
+    "tax": 16.6,
+    "total": 245.6,
+    "shipping_method": "Standard",
+    "payment_method": "Mastercard •••• 5510",
+    "carrier": "UPS",
+    "tracking_number": "1Z9979544025",
+    "shipped_at": "2026-09-10",
+    "estimated_delivery": "2026-09-16",
+    "delivered_at": "2026-09-13",
+    "events": [],
+    "return": {
+      "rma": "RMA-55120",
+      "reason": "Size exchange (M → L)",
+      "label_created": "2026-09-14",
+      "status": "Awaiting carrier scan"
+    }
+  },
+  {
+    "id": "ORD-10230",
+    "customer_id": "CUST-004",
+    "placed_at": "2026-06-28",
+    "status": "delivered",
+    "items": [
+      {
+        "sku": "FILTER",
+        "name": "SwiftFlow Water Filter",
+        "qty": 1,
+        "unit_price": 44.95
+      },
+      {
+        "sku": "HEAD-300",
+        "name": "Beacon 300 Headlamp",
+        "qty": 1,
+        "unit_price": 39.95
+      },
+      {
+        "sku": "BOTTLE",
+        "name": "Insulated 32oz Bottle",
+        "qty": 1,
+        "unit_price": 34.95
+      }
+    ],
+    "subtotal": 119.85,
+    "shipping_cost": 0.0,
+    "tax": 8.69,
+    "total": 128.54,
+    "shipping_method": "Standard",
+    "payment_method": "Apple Pay",
+    "carrier": "UPS",
+    "tracking_number": "1Z3428605135",
+    "shipped_at": "2026-06-29",
+    "estimated_delivery": "2026-07-05",
+    "delivered_at": "2026-07-03",
+    "events": []
+  },
+  {
+    "id": "ORD-10460",
+    "customer_id": "CUST-004",
+    "placed_at": "2026-09-15",
+    "status": "processing",
+    "items": [
+      {
+        "sku": "PACK-65",
+        "name": "Summit 65L Backpack",
+        "qty": 1,
+        "unit_price": 279.0
+      }
+    ],
+    "subtotal": 279.0,
+    "shipping_cost": 0.0,
+    "tax": 20.23,
+    "total": 299.23,
+    "shipping_method": "Standard",
+    "payment_method": "Mastercard •••• 5510",
+    "carrier": null,
+    "tracking_number": null,
+    "shipped_at": null,
+    "estimated_delivery": null,
+    "delivered_at": null,
+    "events": []
+  },
+  {
+    "id": "ORD-10299",
+    "customer_id": "CUST-005",
+    "placed_at": "2026-08-21",
+    "status": "refunded",
+    "items": [
+      {
+        "sku": "BOOT-HK",
+        "name": "Trailhead Waterproof Hiking Boots",
+        "qty": 1,
+        "unit_price": 179.0
+      }
+    ],
+    "subtotal": 179.0,
+    "shipping_cost": 0.0,
+    "tax": 12.98,
+    "total": 191.98,
+    "shipping_method": "Standard",
+    "payment_method": "Visa •••• 4242",
+    "carrier": "Canada Post",
+    "tracking_number": "94002703729684",
+    "shipped_at": "2026-08-22",
+    "estimated_delivery": "2026-08-28",
+    "delivered_at": "2026-08-30",
+    "events": [],
+    "refund": {
+      "amount": 179.0,
+      "issued_at": "2026-09-09",
+      "method": "Original payment method"
+    }
+  },
+  {
+    "id": "ORD-10433",
+    "customer_id": "CUST-005",
+    "placed_at": "2026-09-11",
+    "status": "out_for_delivery",
+    "items": [
+      {
+        "sku": "BASE-MW",
+        "name": "Merino Midweight Base Layer",
+        "qty": 1,
+        "unit_price": 89.0
+      },
+      {
+        "sku": "FILTER",
+        "name": "SwiftFlow Water Filter",
+        "qty": 1,
+        "unit_price": 44.95
+      }
+    ],
+    "subtotal": 133.95,
+    "shipping_cost": 0.0,
+    "tax": 9.71,
+    "total": 143.66,
+    "shipping_method": "Standard",
+    "payment_method": "Mastercard •••• 5510",
+    "carrier": "Canada Post",
+    "tracking_number": "94009790005680",
+    "shipped_at": "2026-09-12",
+    "estimated_delivery": "2026-09-18",
+    "delivered_at": null,
+    "events": [
+      {
+        "date": "2026-09-12",
+        "description": "Shipped from Columbus, OH"
+      },
+      {
+        "date": "2026-09-15",
+        "description": "Out for delivery — Toronto, ON"
+      }
+    ]
+  },
+  {
+    "id": "ORD-10375",
+    "customer_id": "CUST-002",
+    "placed_at": "2026-08-01",
+    "status": "canceled",
+    "items": [
+      {
+        "sku": "KAYAK-10",
+        "name": "Drift 10ft Recreational Kayak",
+        "qty": 1,
+        "unit_price": 799.0
+      }
+    ],
+    "subtotal": 799.0,
+    "shipping_cost": 0.0,
+    "tax": 57.93,
+    "total": 856.93,
+    "shipping_method": "Standard",
+    "payment_method": "Mastercard •••• 5510",
+    "carrier": null,
+    "tracking_number": null,
+    "shipped_at": null,
+    "estimated_delivery": null,
+    "delivered_at": null,
+    "events": []
+  }
+]

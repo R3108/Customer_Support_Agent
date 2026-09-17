@@ -1,0 +1,72 @@
+[
+  {
+    "id": "CUST-001",
+    "name": "Maya Chen",
+    "email": "maya.chen@example.com",
+    "phone": "+1-415-555-0134",
+    "tier": "Aurora+",
+    "member_since": "2022-04-11",
+    "membership_renews": "2027-04-11",
+    "rewards_points": 1840,
+    "lifetime_value": 2310.45,
+    "address": "88 Mission St, San Francisco, CA 94105",
+    "two_factor_enabled": true,
+    "notes": "Frequent backpacker; prefers email follow-ups."
+  },
+  {
+    "id": "CUST-002",
+    "name": "Jordan Alvarez",
+    "email": "jordan.alvarez@example.com",
+    "phone": "+1-720-555-0188",
+    "tier": "Standard",
+    "member_since": "2024-09-02",
+    "membership_renews": null,
+    "rewards_points": 320,
+    "lifetime_value": 486.2,
+    "address": "1410 Pearl St, Boulder, CO 80302",
+    "two_factor_enabled": false,
+    "notes": ""
+  },
+  {
+    "id": "CUST-003",
+    "name": "Priya Raman",
+    "email": "priya.raman@example.com",
+    "phone": "+1-503-555-0161",
+    "tier": "Aurora+",
+    "member_since": "2021-01-19",
+    "membership_renews": "2027-01-19",
+    "rewards_points": 4120,
+    "lifetime_value": 5870.9,
+    "address": "2300 NW Johnson St, Portland, OR 97210",
+    "two_factor_enabled": true,
+    "notes": "VIP. Previously had a warranty claim on a tent pole (resolved)."
+  },
+  {
+    "id": "CUST-004",
+    "name": "Sam Okafor",
+    "email": "sam.okafor@example.com",
+    "phone": "+1-802-555-0112",
+    "tier": "Standard",
+    "member_since": "2026-06-28",
+    "membership_renews": null,
+    "rewards_points": 95,
+    "lifetime_value": 129.0,
+    "address": "45 Church St, Burlington, VT 05401",
+    "two_factor_enabled": false,
+    "notes": "New customer."
+  },
+  {
+    "id": "CUST-005",
+    "name": "Elena Rossi",
+    "email": "elena.rossi@example.com",
+    "phone": "+1-647-555-0173",
+    "tier": "Standard",
+    "member_since": "2025-03-14",
+    "membership_renews": null,
+    "rewards_points": 610,
+    "lifetime_value": 972.35,
+    "address": "220 King St W, Toronto, ON M5H 1K4, Canada",
+    "two_factor_enabled": true,
+    "notes": "Canadian shipping address."
+  }
+]

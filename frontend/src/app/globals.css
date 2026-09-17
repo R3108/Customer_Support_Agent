@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Not inlined: brand utilities reference these variables so a workspace accent colour can override them at runtime. */
+@theme {
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+  --color-ink-950: #0b0d1a;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: #f7f8fb;
+  color: #0f172a;
+}
+
+::selection {
+  background: var(--color-brand-200);
+}
+
+/* Chat markdown */
+.prose-chat p {
+  margin: 0 0 0.5rem;
+}
+.prose-chat p:last-child {
+  margin-bottom: 0;
+}
+.prose-chat ul,
+.prose-chat ol {
+  margin: 0.35rem 0 0.6rem;
+  padding-left: 1.15rem;
+}
+.prose-chat ul {
+  list-style: disc;
+}
+.prose-chat ol {
+  list-style: decimal;
+}
+.prose-chat li {
+  margin: 0.15rem 0;
+}
+.prose-chat li:last-child,
+.prose-chat ul:last-child,
+.prose-chat ol:last-child {
+  margin-bottom: 0;
+}
+.prose-chat strong {
+  font-weight: 600;
+}
+.prose-chat code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: rgb(15 23 42 / 0.06);
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.25rem;
+}
+.prose-chat a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose-kb h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+.prose-kb h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.1rem 0 0.35rem;
+}
+.prose-kb p,
+.prose-kb li {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #334155;
+}
+.prose-kb ul {
+  list-style: disc;
+  padding-left: 1.2rem;
+}
+.prose-kb ol {
+  list-style: decimal;
+  padding-left: 1.2rem;
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-bubble {
+  animation: bubble-in 0.22s ease-out both;
+}
+
+@keyframes dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.typing-dot {
+  animation: dot 1.2s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.bg-grid {
+  background-image: linear-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bubble,
+  .typing-dot {
+    animation: none;
+  }
+}

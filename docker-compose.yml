@@ -1,0 +1,26 @@
+services:
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      RELAY_CORS_ORIGINS: http://localhost:3000
+    volumes:
+      - relay-storage:/app/storage
+      - ./backend/knowledge_base:/app/knowledge_base
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  relay-storage:
