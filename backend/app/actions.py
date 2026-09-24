@@ -186,7 +186,12 @@ def list_actions(status: str | None = None, conversation_id: str | None = None) 
 
 
 def pending_for_order(order_id: str) -> dict[str, Any] | None:
-    rows = db.query("SELECT * FROM actions WHERE order_id = ? AND status = 'pending_approval' LIMIT 1", (order_id,))
+    # A Test Lab run must neither reuse nor be blocked by a real customer's pending approval (and vice versa).
+    scope = "LIKE" if commerce.in_sandbox() else "NOT LIKE"
+    rows = db.query(
+        f"SELECT * FROM actions WHERE order_id = ? AND status = 'pending_approval' AND COALESCE(conversation_id, '') {scope} 'sbx\\_%' ESCAPE '\\' LIMIT 1",
+        (order_id,),
+    )
     return _decorate(rows[0]) if rows else None
 
 

@@ -5,8 +5,19 @@
 
 from __future__ import annotations
 
-from . import commerce, db, workspace
+from datetime import datetime, timedelta, timezone
+
+from . import commerce, db, evals, workspace
+from .auth import Principal
 from .main import ChatRequest, TicketReply, reply_ticket, run_turn
+
+
+def backdate(conversation_id: str, days: float) -> None:
+    """Move a conversation into the past so Pulse has a baseline week to compare today against."""
+    ts = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    for table, column in (("messages", "conversation_id"), ("tickets", "conversation_id"), ("actions", "conversation_id")):
+        db.execute(f"UPDATE {table} SET created_at = ? WHERE {column} = ?", (ts, conversation_id))
+    db.execute("UPDATE conversations SET created_at = ?, updated_at = ? WHERE id = ?", (ts, ts, conversation_id))
 
 
 def converse(customer_id: str | None, messages: list[str]) -> str:
@@ -50,11 +61,39 @@ def main() -> None:
     handled = converse("CUST-004", ["I'd like to talk to a human please"])
     ticket = db.open_ticket_for_conversation(handled)
     if ticket:
-        reply_ticket(ticket["id"], TicketReply(content="Hi Sam, Alex here — happy to help. What can I do for you?", agent_name="Alex", resolve=True))
+        reply_ticket(ticket["id"], TicketReply(content="Hi Sam, Alex here — happy to help. What can I do for you?", agent_name="Alex", resolve=True),
+                     principal=Principal(kind="open", role="admin"))
         db.update_conversation(handled, csat=5)
 
+    # Pulse: a normal week of traffic (one damaged-item contact in 7 days)...
+    baseline = [
+        ("CUST-002", "Do you ship to Canada?"), ("CUST-005", "How long does standard shipping take?"),
+        ("CUST-001", "What's your return policy?"), (None, "How do I reset my password?"),
+        ("CUST-004", "Where is my order?"), ("CUST-002", "What payment methods do you accept?"),
+        ("CUST-005", "My jacket zipper arrived broken"),
+    ]
+    for day, (customer, question) in enumerate(baseline, start=1):
+        backdate(converse(customer, [question]), day + 0.3)
+    # ...then today's surge: a bad batch of stoves arriving damaged.
+    for customer, messages in [
+        ("CUST-005", ["My new stove arrived damaged", "ORD-10433"]),
+        ("CUST-002", ["The camping stove I got is broken out of the box"]),
+        ("CUST-004", ["My stove arrived cracked, this is ridiculous"]),
+        (None, ["Received a damaged stove, the burner is bent"]),
+    ]:
+        converse(customer, messages)
+
+    # Customer health: an unhappy repeat contact.
+    unhappy = converse("CUST-002", ["Still no update on my issue, this is useless", "I want to talk to a manager"])
+    db.update_conversation(unhappy, csat=1)
+
+    # Test Lab: one baseline run so the page shows results immediately.
+    evals.seed_builtin_scenarios()
+    run = evals.start_run(None, triggered_by="Demo seed", wait=True)
+
     stats = db.analytics()
-    print(f"Seeded {stats['total_conversations']} conversations, {stats['open_tickets']} open tickets.")
+    print(f"Seeded {stats['total_conversations']} conversations, {stats['open_tickets']} open tickets, "
+          f"Test Lab {run['passed']}/{run['total']} passing.")
 
 
 if __name__ == "__main__":

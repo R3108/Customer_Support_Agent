@@ -8,9 +8,12 @@ analytics need.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
@@ -115,14 +118,102 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
     duration_ms INTEGER,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,                  -- lower-cased
+    name TEXT,
+    picture TEXT,
+    role TEXT NOT NULL DEFAULT 'agent',          -- admin | agent
+    status TEXT NOT NULL DEFAULT 'invited',      -- invited | active | disabled
+    google_sub TEXT UNIQUE,
+    invited_by TEXT,
+    created_at TEXT NOT NULL,
+    last_login_at TEXT
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,                         -- SHA-256 of the cookie token; the raw token is never stored
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_agent TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE TABLE IF NOT EXISTS eval_scenarios (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    customer_id TEXT,                            -- who the simulated customer is signed in as (NULL = guest)
+    turns TEXT NOT NULL,                         -- JSON list of customer messages, sent in order
+    expect TEXT NOT NULL,                        -- JSON expectations checked against the final reply
+    source TEXT NOT NULL DEFAULT 'custom',       -- builtin | custom | conversation
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS eval_runs (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,                        -- running | completed | failed
+    total INTEGER NOT NULL,
+    passed INTEGER NOT NULL DEFAULT 0,
+    failed INTEGER NOT NULL DEFAULT 0,
+    results TEXT,                                -- JSON list, one entry per scenario
+    engine TEXT,
+    triggered_by TEXT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT
+);
+CREATE TABLE IF NOT EXISTS pulse_alerts (
+    key TEXT PRIMARY KEY,                        -- "<kind>:<key>:<day>": one alert per issue per day
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    actor TEXT,                                  -- email, "api_key" or "open"
+    actor_kind TEXT,                             -- user | api_key | open | system
+    action TEXT NOT NULL,                        -- e.g. settings.update, action.approve, customer.erase
+    target_type TEXT,
+    target_id TEXT,
+    ip TEXT,
+    request_id TEXT,
+    details TEXT,                                -- JSON
+    prev_hash TEXT NOT NULL,
+    hash TEXT NOT NULL                           -- SHA-256 over this entry + prev_hash: edits break the chain
+);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action, id);
+CREATE TABLE IF NOT EXISTS webhook_outbox (
+    id TEXT PRIMARY KEY,
+    webhook_id TEXT NOT NULL,
+    event TEXT NOT NULL,
+    envelope TEXT NOT NULL,                      -- JSON; its id is stable across retries so receivers can dedupe
+    status TEXT NOT NULL,                        -- pending | sending | delivered | dead
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at TEXT NOT NULL,
+    last_error TEXT,
+    last_status_code INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    delivered_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_outbox_due ON webhook_outbox(status, next_attempt_at);
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key TEXT PRIMARY KEY,                        -- "<customer or guest>:<Idempotency-Key header>"
+    request_hash TEXT NOT NULL,
+    status TEXT NOT NULL,                        -- processing | done
+    response TEXT,                               -- JSON
+    created_at TEXT NOT NULL
+);
 """
+
+# Tables whose changes are pushed live to the console (see events.py).
+_WRITE_TABLE = re.compile(r"^\s*(?:INSERT(?:\s+OR\s+\w+)?\s+INTO|UPDATE|DELETE\s+FROM)\s+(\w+)", re.I)
 
 # Columns added after the first release; applied to existing databases on startup.
 MIGRATIONS: list[tuple[str, str, str]] = [
     ("conversations", "language", "TEXT"),
     ("tickets", "sla_breach_notified", "INTEGER NOT NULL DEFAULT 0"),
+    ("conversations", "sandbox", "INTEGER NOT NULL DEFAULT 0"),  # Test Lab runs; hidden from the console
+    ("conversations", "erased_at", "TEXT"),  # personal data removed (GDPR erasure or retention policy)
 ]
-JSON_COLUMNS = {"meta", "params", "result", "events", "patch", "value"}
+JSON_COLUMNS = {"meta", "params", "result", "events", "patch", "value", "turns", "expect", "results", "details", "envelope", "response"}
 
 DEFAULT_MACROS = [
     ("Order delay apology", "Hi {first_name}, I'm sorry {order_id} is taking longer than expected. I've opened a trace with the carrier and "
@@ -207,9 +298,16 @@ def execute(sql: str, params: tuple = ()) -> sqlite3.Cursor:
     return _execute(sql, params)
 
 
+@contextmanager
+def exclusive() -> Iterator[None]:
+    """Hold the connection lock across several calls, for read-then-write sequences that must not interleave."""
+    with _lock:
+        yield
+
+
 # ---------------------------------------------------------------- workspace settings & order state
 def load_workspace_settings() -> dict[str, Any]:
-    return {r["key"]: r["value"] for r in _query("SELECT key, value FROM workspace_settings WHERE key != 'macros_seeded'")}
+    return {r["key"]: r["value"] for r in _query("SELECT key, value FROM workspace_settings WHERE key NOT LIKE '%\\_seeded' ESCAPE '\\'")}
 
 
 def save_workspace_settings(values: dict[str, Any]) -> None:
@@ -223,6 +321,9 @@ def save_workspace_settings(values: dict[str, Any]) -> None:
                 (key, json.dumps(value), ts),
             )
         c.commit()
+    from . import events
+
+    events.publish("workspace_settings")
 
 
 def order_patches() -> dict[str, dict[str, Any]]:
@@ -242,7 +343,12 @@ def _execute(sql: str, params: tuple = ()) -> sqlite3.Cursor:
         c = conn()
         cur = c.execute(sql, params)
         c.commit()
-        return cur
+    # Every product write funnels through here, so this is the one place that feeds the live console.
+    if match := _WRITE_TABLE.match(sql):
+        from . import events  # local import: events imports nothing from db, but keep db importable on its own
+
+        events.publish(match.group(1).lower())
+    return cur
 
 
 def _query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
@@ -251,12 +357,12 @@ def _query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------- conversations
-def create_conversation(customer_id: str | None, title: str | None = None) -> dict[str, Any]:
-    cid = f"conv_{uuid.uuid4().hex[:12]}"
+def create_conversation(customer_id: str | None, title: str | None = None, sandbox: bool = False) -> dict[str, Any]:
+    cid = f"{'sbx' if sandbox else 'conv'}_{uuid.uuid4().hex[:12]}"
     ts = now_iso()
     _execute(
-        "INSERT INTO conversations (id, customer_id, status, title, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-        (cid, customer_id, "ai", title, ts, ts),
+        "INSERT INTO conversations (id, customer_id, status, title, sandbox, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+        (cid, customer_id, "ai", title, int(sandbox), ts, ts),
     )
     return get_conversation(cid)  # type: ignore[return-value]
 
@@ -280,10 +386,11 @@ def list_conversations(status: str | None = None, limit: int = 100) -> list[dict
                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS message_count,
                (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY id DESC LIMIT 1) AS last_message
         FROM conversations c
+        WHERE c.sandbox = 0
     """
     params: tuple = ()
     if status:
-        sql += " WHERE c.status = ?"
+        sql += " AND c.status = ?"
         params = (status,)
     sql += " ORDER BY c.updated_at DESC LIMIT ?"
     return _query(sql, (*params, limit))
@@ -341,9 +448,10 @@ def update_ticket(ticket_id: str, **fields: Any) -> None:
 def list_tickets(status: str | None = None) -> list[dict[str, Any]]:
     order = """ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
                         created_at ASC"""
+    live = "conversation_id NOT IN (SELECT id FROM conversations WHERE sandbox = 1)"
     if status:
-        return _query(f"SELECT * FROM tickets WHERE status = ? {order}", (status,))
-    return _query(f"SELECT * FROM tickets {order}")
+        return _query(f"SELECT * FROM tickets WHERE status = ? AND {live} {order}", (status,))
+    return _query(f"SELECT * FROM tickets WHERE {live} {order}")
 
 
 # ---------------------------------------------------------------- analytics
@@ -373,8 +481,15 @@ def analytics() -> dict[str, Any]:
     confidences: list[float] = []
     latencies: list[float] = []
     buckets = {"0-40": 0, "40-60": 0, "60-80": 0, "80-100": 0}
+    llm = {"llm_calls": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "priced": False}
     for (meta_json,) in ai_msgs:
         meta = json.loads(meta_json or "{}")
+        if usage := meta.get("usage"):
+            for key in ("llm_calls", "input_tokens", "output_tokens"):
+                llm[key] += int(usage.get(key) or 0)
+            if usage.get("cost_usd") is not None:
+                llm["cost_usd"] += float(usage["cost_usd"])
+                llm["priced"] = True
         if meta.get("intent"):
             intents[meta["intent"]] = intents.get(meta["intent"], 0) + 1
         if isinstance(meta.get("confidence"), (int, float)):
@@ -402,4 +517,12 @@ def analytics() -> dict[str, Any]:
         "tickets_by_priority": tickets_by_priority,
         "tickets_by_category": tickets_by_reason,
         "conversations_per_day": [{"day": d, "count": n} for d, n in reversed(daily)],
+        "llm_usage": {
+            "llm_calls": llm["llm_calls"],
+            "input_tokens": llm["input_tokens"],
+            "output_tokens": llm["output_tokens"],
+            # None when no token prices are configured, rather than a misleading $0.
+            "cost_usd": round(llm["cost_usd"], 4) if llm["priced"] else None,
+            "cost_per_conversation": round(llm["cost_usd"] / total_convs, 4) if llm["priced"] and total_convs else None,
+        },
     }

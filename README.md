@@ -14,7 +14,8 @@ The demo company is **Aurora Outfitters**, a fictional outdoor-gear retailer wit
 | Live demo with agent trace | `/demo` | Seeing every agent decision in real time |
 | Agent console | `/console` | Specialists: queue, approvals, copilot, macros |
 | Knowledge base manager | `/knowledge` | Articles, knowledge gaps, AI article drafts, retrieval testing |
-| Analytics | `/analytics` | ROI, SLA, automation, languages, CSAT, CSV export |
+| Analytics | `/analytics` | Pulse (emerging issues), at-risk customers, ROI, SLA, automation, languages, CSAT, CSV export |
+| Test Lab | `/evals` | Regression tests for the AI agent: scripted conversations + expected decisions, run in a sandbox |
 | Settings | `/settings` | Branding, AI policies, widget install, webhooks & Slack, macros |
 | Embeddable widget | `/widget.js`, `/embed`, `/widget-demo.html` | Any website, one `<script>` tag |
 
@@ -28,9 +29,28 @@ The demo company is **Aurora Outfitters**, a fictional outdoor-gear retailer wit
 | **Specialist copilot & macros** | Rewrite a reply friendlier / shorter / more formal / more empathetic, fix grammar, or translate into the customer's language. Macros insert saved replies with `{first_name}`, `{order_id}`, `{ticket_id}`, `{agent_name}`, `{company_name}` filled in. |
 | **Workspace settings** | Company and assistant name, accent colour (re-tints the widget live), welcome message, suggested prompts, confidence threshold, refund limit, friction limit, action/multilingual toggles and ROI assumptions — stored in the database and applied without a restart. |
 | **One-line widget** | `<script src="https://your-app/widget.js" async></script>` adds a themed launcher and iframe chat to any site (`data-position`, `data-open`, `window.Relay.open()`). |
-| **Webhooks & Slack** | `ticket.created`, `ticket.resolved`, `action.approval_requested`, `action.completed`, `sla.breached`, `feedback.negative`. Generic endpoints are signed (`X-Relay-Signature: sha256=HMAC(secret, "<timestamp>.<body>")`); Slack endpoints get formatted messages. A background monitor fires SLA breaches once per ticket. Delivery log in Settings. |
+| **Webhooks & Slack** | `ticket.created`, `ticket.resolved`, `action.approval_requested`, `action.completed`, `sla.breached`, `feedback.negative`, `insight.spike`. Generic endpoints are signed (`X-Relay-Signature: sha256=HMAC(secret, "<timestamp>.<body>")`); Slack endpoints get formatted messages. A background monitor fires SLA breaches once per ticket. Delivery log in Settings. |
 | **ROI & SLA analytics** | Estimated agent hours and cost saved, automated vs. approved actions, SLA compliance, first-response and resolution time, language mix, and CSV exports (formula-injection safe). |
 | **Guardrails** | Prompt-injection / off-topic requests never reach the model; policy overrides never leak the model's overridden draft to the customer. |
+| **Test Lab** | Regression tests for the agent. A scenario is a scripted customer conversation plus expectations about the final reply (intent, escalate or not, escalation reason, action offered/executed/queued, language, knowledge gap, minimum confidence, phrases it must / must never say). Runs replay scenarios through the real graph in a **sandbox**: orders are pristine and changes stay in memory, sandbox tickets/messages/actions/agent memory are deleted afterwards, nothing appears in the console and no webhook fires. 12 built-in scenarios cover the demo script and guardrails; **Save as test** in the console freezes any real conversation into a scenario. Live progress, per-check diffs, transcripts and pass-rate history. Run it after changing a policy, an article or the model. |
+| **Pulse** | Early warning for emerging issues: compares the last 24h with the previous 7 days and flags surging topics (intents), negative sentiment and escalations to a team — with a sparkline, the multiplier over baseline and example questions. Fires an `insight.spike` webhook (Slack-formatted) once per issue per day. |
+| **Customer health** | An explainable 0–100 churn-risk score per customer (repeat contacts, escalations, open tickets, missed SLAs, angry/frustrated turns, low CSAT, denied requests, returns; happy ratings add back). Shown on every conversation in the console with the top reasons, and as an at-risk list with lifetime value at risk in Analytics. |
+
+### Production operations
+
+| Feature | What it does |
+| --- | --- |
+| **Observability** | Every request gets an `X-Request-ID` (yours if you send a sane one), echoed back and stamped on every log line, including the agents' model calls, so one ID traces a whole turn. `RELAY_LOG_FORMAT=json` emits one JSON object per line. `GET /metrics` serves Prometheus metrics: request rate and latency per route template, **per-agent-node latency**, turn outcomes, LLM calls/tokens/circuit state, webhook attempts and outbox depth, PII redactions, live consoles. Each trace step also carries its `duration_ms`. |
+| **Health probes** | `GET /api/health/live` (process up) and `GET /api/health/ready` (database, agent memory and knowledge base each probed with latency; **503** if any fails). The LLM is reported but never fails readiness, because Relay still answers on the offline engine. |
+| **LLM circuit breaker** | After `RELAY_LLM_CIRCUIT_FAILURE_THRESHOLD` consecutive provider failures, the model is skipped for the cooldown, so customers get an instant offline answer instead of waiting out timeouts and retries during an outage. Then one trial call is let through (half-open); success closes the circuit. |
+| **Token & cost accounting** | Tokens from every model call are summed per turn into the reply's `meta.usage`, and totalled in analytics (`llm_usage`: calls, tokens, cost, cost per conversation). Set your model's prices with `RELAY_LLM_*_COST_PER_MTOK`; until then cost is reported as unknown, not $0. |
+| **PII redaction** | Card numbers (Luhn plus network prefix), SSNs, CVVs, one-time codes, PINs and password-looking values are masked **before** the message is stored, shown to specialists, written to agent memory or sent to a model. The customer sees their masked message and a short notice. |
+| **Privacy requests & retention** | Export everything held about a customer as JSON (access request), or erase it: message text, ticket notes and action details are wiped, the customer link removed and agent memory deleted, while non-personal facts (intent, confidence, outcome) keep analytics truthful. `RELAY_RETENTION_DAYS` applies the same anonymization automatically to closed conversations, never to open escalations. |
+| **Tamper-evident audit log** | Settings changes (with before/after), approvals and denials, ticket edits and replies, KB edits, macros, webhooks, team changes, sign-ins (including failures), exports, erasures and retention runs. Each entry records the actor, IP and request ID and is **hash-chained** to the previous one; `GET /api/admin/audit/verify` pinpoints the first edited, removed or reordered entry. |
+| **Durable webhooks** | Events go to an outbox first, then are delivered. Failures retry with exponential backoff and jitter (30 s → 24 h) from a background worker, survive restarts, and are dead-lettered after `RELAY_WEBHOOK_MAX_ATTEMPTS`, with one-click replay. The envelope `id` is stable across attempts (dedupe on it); `X-Relay-Attempt` and `X-Relay-Delivery` headers identify the try. |
+| **SSRF protection** | Webhook URLs pointing at loopback, private, link-local (e.g. cloud metadata `169.254.169.254`) or `.internal` hosts are refused when saved, and the resolved IPs are checked again on every delivery, with redirects disabled. |
+| **Idempotency keys** | `POST /api/chat` accepts `Idempotency-Key`: a retried request replays the stored response (`Idempotent-Replayed: true`) instead of sending the message twice; reusing a key with a different body is a 422, and one still in progress a 409. |
+| **Rate-limit headers & hardening** | The chat limit advertises `RateLimit-Limit/Remaining/Reset` and `Retry-After` on 429. `RELAY_TRUST_PROXY_HEADERS` takes the client IP from `X-Forwarded-For` behind your proxy. Responses carry `nosniff`, `no-referrer` and `X-Frame-Options`, console responses are `no-store`, and HSTS is opt-in. |
 
 ---
 
@@ -197,7 +217,9 @@ Public (customer-facing):
 | `GET` | `/api/conversations/{id}` | Transcript + open ticket |
 | `GET` | `/api/conversations/{id}/messages?after_id=` | Poll for specialist replies |
 | `POST` | `/api/conversations/{id}/feedback` | CSAT rating 1–5 |
-| `GET` | `/api/config`, `/api/health` | Branding, engine, KB stats |
+| `GET` | `/api/config`, `/api/health` | Branding, engine, KB stats, LLM circuit state |
+| `GET` | `/api/health/live` · `/api/health/ready` | Liveness · readiness probes (503 when a dependency is down) |
+| `GET` | `/metrics` | Prometheus metrics (`Authorization: Bearer <RELAY_METRICS_TOKEN>` when set) |
 | `GET` | `/api/demo/customers` | Demo identities (remove in production) |
 
 Admin (require `X-Admin-Key` when `RELAY_ADMIN_API_KEY` is set):
@@ -220,8 +242,20 @@ Admin (require `X-Admin-Key` when `RELAY_ADMIN_API_KEY` is set):
 | `GET` | `/api/admin/insights/knowledge-gaps?days=30` | Clustered unanswered questions |
 | `POST` | `/api/admin/kb/drafts` · `/api/admin/kb/drafts/ticket/{id}` | Article draft from questions or a resolved ticket (PII redacted) |
 | `GET/POST/PATCH/DELETE` | `/api/admin/webhooks[/{id}]`, `POST …/{id}/test` | Endpoints, event catalog, delivery log |
-| `POST` | `/api/admin/sla/check` | Run the SLA breach check now (also runs every 60s) |
+| `POST` | `/api/admin/sla/check` | Run the SLA breach check now (also runs every 60s, with the Pulse spike check) |
+| `GET` | `/api/admin/insights/pulse` | Emerging issues: last 24h vs. the 7-day baseline |
+| `GET` | `/api/admin/insights/customer-health` · `/api/admin/customers/{id}/health` | At-risk customers · one customer's health score and factors |
+| `GET` | `/api/admin/evals` | Test Lab: scenarios with their latest result, run history, catalog |
+| `POST/PUT/DELETE` | `/api/admin/evals/scenarios[/{id}]` | Create / edit / delete scenarios (edit and delete need an admin) |
+| `POST` | `/api/admin/evals/scenarios/from-conversation/{id}` | Save a real conversation as a regression test |
+| `POST` | `/api/admin/evals/runs` | Run all or selected scenarios (`{"scenario_ids": [...], "wait": true}` blocks — handy in CI) |
+| `GET` | `/api/admin/evals/runs/{id}` | A run with per-scenario checks and transcripts |
 | `GET` | `/api/admin/export/tickets.csv` · `conversations.csv` | CSV exports |
+| `GET` | `/api/admin/webhooks/outbox[?status=]` · `POST …/outbox/{id}/retry` | Delivery queue (pending, delivered, dead) · replay a delivery |
+| `GET` | `/api/admin/audit?action=&actor=&target_type=&target_id=&before_id=` | Audit log (`action=action.*` matches a family; cursor pagination) |
+| `GET` | `/api/admin/audit/verify` | Recompute the hash chain; reports the first tampered entry |
+| `GET` | `/api/admin/customers/{id}/export` | Everything held about a customer, as a JSON download |
+| `POST` | `/api/admin/customers/{id}/erase` · `/api/admin/conversations/{id}/erase` | Anonymize a customer's or one conversation's data (`{"confirm": "<id>"}`) |
 | `POST` | `/api/admin/demo/reset-orders` | Undo demo cancellations, returns and refunds |
 
 Interactive docs: http://localhost:8000/docs
@@ -242,8 +276,15 @@ backend/
     i18n.py            language detection + localization
     insights.py        knowledge gaps + article drafts (PII redaction)
     copilot.py         specialist rewrite / translate
-    webhooks.py        signed webhooks, Slack alerts, SLA monitor
+    webhooks.py        signed webhooks, Slack alerts, durable outbox with retries, SSRF guard, SLA monitor
+    observability.py   request IDs, JSON logs, Prometheus metrics, security headers (ASGI middleware)
+    audit.py           hash-chained audit log + verification
+    privacy.py         PII redaction, data export / erasure, retention policy
+    idempotency.py     Idempotency-Key handling for retry-safe writes
     reporting.py       ROI, SLA, automation metrics + CSV exports
+    evals.py           Test Lab: scenarios, sandboxed runs, expectation checks
+    pulse.py           emerging-issue detection + insight.spike alerts
+    health.py          explainable customer health / churn-risk score
     workspace.py       runtime workspace settings
     db.py              SQLite: conversations, messages, tickets, actions, macros, webhooks, settings
     llm.py             provider resolution + structured calls with offline fallback
@@ -251,10 +292,12 @@ backend/
     seed.py            demo data generator
   knowledge_base/      help-center articles (markdown)
   data/                customers.json · orders.json
-  tests/               72 tests: retrieval, signals, flows, handoff, guardrails, actions, approvals,
-                       settings, multilingual, knowledge gaps, copilot, macros, webhooks, SLA, reporting
+  tests/               140 tests: retrieval, signals, flows, handoff, guardrails, actions, approvals,
+                       settings, multilingual, knowledge gaps, copilot, macros, webhooks, SLA, reporting,
+                       Test Lab sandboxing, Pulse, customer health, observability, circuit breaker,
+                       PII redaction, privacy requests, audit chain, outbox retries, SSRF, idempotency
 frontend/
-  src/app/             / (landing) · (app)/demo · console · knowledge · analytics · settings · embed
+  src/app/             / (landing) · (app)/demo · console · knowledge · analytics · evals · settings · embed
   src/components/      ChatPanel · ChatWidget · AgentTrace · AppShell · ...
   src/hooks/           useChat (SSE streaming, resumable conversations, handoff polling) · useAsync · useWorkspaceConfig
   src/lib/             api client · types · formatting · theme (runtime accent colour)
@@ -285,6 +328,11 @@ This repo is production-shaped, but a few seams are intentionally simple for a s
 * **Real-time** — specialist replies are delivered by 3-second polling; swap for WebSockets if needed.
 * **Actions** — `app/actions.py` `_apply()` is the seam to call your OMS/payment provider (Shopify cancel, Stripe refund);
   the policy checks, confirmation flow, approvals and audit trail stay the same.
-* **Webhooks** — admin-configured URLs are called server-side; restrict egress (or add an allowlist) in production.
+* **Webhooks** — private-network destinations are refused and deliveries are retried from a durable outbox. For defence in
+  depth, still restrict egress at the network layer (the DNS check can't fully rule out rebinding between check and connect).
+* **Audit log** — the hash chain detects edits, but someone with database write access could rebuild it; forward entries to
+  append-only storage or your SIEM for stronger guarantees.
+* **Access logs** — Relay writes its own access log with request IDs; run uvicorn with `--no-access-log` to avoid duplicates.
 * **Widget identity** — `data-customer-id` is for demos; pass a signed session token from your backend instead.
-* **Rate limiting** — in-memory per-IP; use Redis or your gateway behind a load balancer.
+* **Rate limiting** — in-memory per-IP (sliding window, standard headers); with several instances, use Redis or your gateway,
+  and set `RELAY_TRUST_PROXY_HEADERS=true` behind your load balancer so limits apply per client, not per proxy.

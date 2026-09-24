@@ -9,5 +9,8 @@ pydantic==2.13.5
 pydantic-settings==2.15.0
 python-dotenv
 httpx==0.28.1
+# Sign in with Google: verifies Google ID tokens (requests is its HTTP transport)
+google-auth==2.58.0
+requests==2.34.2
 # dev / test
 pytest==9.1.1

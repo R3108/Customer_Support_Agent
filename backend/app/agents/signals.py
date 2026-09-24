@@ -50,6 +50,13 @@ HARD_TRIGGERS: dict[str, list[str]] = {
         r"\b(caught|catch|on)\s+fire\b",
         r"\b(burned|burnt|burns)\b",
         r"\b(hospital|emergency room|unsafe|hazard|exploded|explode|carbon monoxide)\b",
+        # Everyday descriptions of getting hurt ("cut my hand", "I'm bleeding"), anchored to body parts so
+        # "cut my order" doesn't trigger.
+        r"\b(cut|sliced|gashed|burned|broke|sprained|smashed|hurt)\s+(my|his|her|their|our)\s+(own\s+)?"
+        r"(hand|finger|thumb|arm|leg|foot|toe|face|head|eye|knee|wrist|ankle|skin|back|lip)s?\b",
+        r"\b(bleeding|bled|stitches|concussion|electrocuted|electric(al)?\s+shock|allergic\s+reaction)\b",
+        r"\b(got|get|was|am|been|is|are|were|getting)\s+(badly\s+|seriously\s+)?hurt\b",
+        r"\bhurt\s+(myself|himself|herself|themselves)\b",
     ],
 }
 

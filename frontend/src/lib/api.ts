@@ -2,10 +2,20 @@ import type {
   AgentStep,
   Analytics,
   ArticleDraft,
+  AuthMode,
+  Me,
+  TeamMember,
+  UserRole,
   Conversation,
   ConversationDetail,
   CopilotMode,
+  CustomerHealth,
+  CustomerHealthReport,
   DemoCustomer,
+  EvalOverview,
+  EvalRun,
+  EvalScenario,
+  EvalScenarioInput,
   KBDocument,
   KBDocumentSummary,
   KnowledgeGap,
@@ -13,6 +23,7 @@ import type {
   Message,
   OrderAction,
   PublicConfig,
+  PulseReport,
   SearchHit,
   Ticket,
   Webhook,
@@ -27,6 +38,17 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
   }
+}
+
+/** A human-readable message for anything thrown by an API call. */
+export function errorMessage(error: unknown, fallback = "Something went wrong. Please try again."): string {
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "You're signed out. Sign in again to continue.";
+    if (error.status === 403) return error.message || "You don't have permission to do that.";
+    return error.message || fallback;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 }
 
 export function getAdminKey(): string {
@@ -46,16 +68,23 @@ export function setAdminKey(key: string) {
   }
 }
 
+/** Fired when a console request comes back 401, so the auth layer can show the sign-in screen. */
+export const UNAUTHORIZED_EVENT = "relay:unauthorized";
+
 async function request<T>(path: string, init: RequestInit = {}, admin = false): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body) headers.set("Content-Type", "application/json");
   if (admin && getAdminKey()) headers.set("X-Admin-Key", getAdminKey());
+  // Required by the API on cookie-authenticated writes; foreign sites can't add it without passing CORS.
+  headers.set("X-Relay-CSRF", "1");
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { ...init, headers, cache: "no-store" });
+    // credentials: include sends the HttpOnly session cookie to the API origin.
+    res = await fetch(`${API_URL}${path}`, { ...init, headers, cache: "no-store", credentials: "include" });
   } catch {
     throw new ApiError(0, `Can't reach the Relay API at ${API_URL}. Is the backend running?`);
   }
+  if (res.status === 401 && admin && typeof window !== "undefined") window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -142,14 +171,40 @@ export const api = {
   testWebhook: (id: string) => request<WebhookDelivery>(`/api/admin/webhooks/${id}/test`, { method: "POST" }, true),
 
   resetDemoOrders: () => request<{ ok: boolean }>("/api/admin/demo/reset-orders", { method: "POST" }, true),
+
+  pulse: () => request<PulseReport>("/api/admin/insights/pulse", {}, true),
+  customerHealthReport: (limit = 8) => request<CustomerHealthReport>(`/api/admin/insights/customer-health?limit=${limit}`, {}, true),
+  customerHealth: (id: string) => request<CustomerHealth>(`/api/admin/customers/${id}/health`, {}, true),
+
+  evals: () => request<EvalOverview>("/api/admin/evals", {}, true),
+  evalRun: (id: string) => request<EvalRun>(`/api/admin/evals/runs/${id}`, {}, true),
+  startEvalRun: (scenarioIds?: string[]) =>
+    request<EvalRun>("/api/admin/evals/runs", { method: "POST", body: JSON.stringify({ scenario_ids: scenarioIds ?? null }) }, true),
+  createScenario: (scenario: EvalScenarioInput) =>
+    request<EvalScenario>("/api/admin/evals/scenarios", { method: "POST", body: JSON.stringify(scenario) }, true),
+  updateScenario: (id: string, scenario: EvalScenarioInput) =>
+    request<EvalScenario>(`/api/admin/evals/scenarios/${id}`, { method: "PUT", body: JSON.stringify(scenario) }, true),
+  deleteScenario: (id: string) => request<{ ok: boolean }>(`/api/admin/evals/scenarios/${id}`, { method: "DELETE" }, true),
+  scenarioFromConversation: (conversationId: string) =>
+    request<EvalScenario>(`/api/admin/evals/scenarios/from-conversation/${conversationId}`, { method: "POST" }, true),
+
+  // ---------------------------------------------------------------- auth & team
+  authConfig: () => request<{ mode: AuthMode; google_client_id: string | null }>("/api/auth/config"),
+  me: () => request<Me>("/api/auth/me", {}, true), // sends a stored admin key too, so API-key mode reports its role
+  logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
+  users: () => request<TeamMember[]>("/api/admin/users", {}, true),
+  inviteUser: (email: string, role: UserRole) => request<TeamMember>("/api/admin/users", { method: "POST", body: JSON.stringify({ email, role }) }, true),
+  updateUser: (id: string, patch: { role?: UserRole; status?: "active" | "disabled" }) =>
+    request<TeamMember>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, true),
+  removeUser: (id: string) => request<{ ok: boolean }>(`/api/admin/users/${id}`, { method: "DELETE" }, true),
 };
 
 /** Download an admin CSV export (fetch + blob so the admin key header is sent). */
 export async function downloadExport(kind: "tickets" | "conversations"): Promise<void> {
   const headers = new Headers();
   if (getAdminKey()) headers.set("X-Admin-Key", getAdminKey());
-  const res = await fetch(`${API_URL}/api/admin/export/${kind}.csv`, { headers, cache: "no-store" });
-  if (!res.ok) throw new ApiError(res.status, res.status === 401 ? "Admin key required" : res.statusText);
+  const res = await fetch(`${API_URL}/api/admin/export/${kind}.csv`, { headers, cache: "no-store", credentials: "include" });
+  if (!res.ok) throw new ApiError(res.status, res.statusText);
   const url = URL.createObjectURL(await res.blob());
   const link = document.createElement("a");
   link.href = url;

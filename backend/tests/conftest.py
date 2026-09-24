@@ -12,6 +12,12 @@ os.environ["RELAY_ADMIN_API_KEY"] = ""
 os.environ["RELAY_CHAT_RATE_LIMIT_PER_MINUTE"] = "1000"
 os.environ["RELAY_WEBHOOK_ASYNC"] = "false"
 
+# Tests run against built-in defaults, never a developer's backend/.env (which may enable Google sign-in,
+# change thresholds or add API keys).
+from app.config import Settings  # noqa: E402
+
+Settings.model_config["env_file"] = None
+
 
 @pytest.fixture(scope="session")
 def client():

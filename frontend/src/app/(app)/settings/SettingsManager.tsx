@@ -14,37 +14,48 @@ import {
   Send,
   SlidersHorizontal,
   Trash2,
+  UserPlus,
+  Users,
   Webhook as WebhookIcon,
 } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ErrorNotice } from "@/components/AppShell";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { LogoMark } from "@/components/Logo";
+import { useDialog } from "@/components/ui/Dialog";
+import { CardSkeleton, LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import { useAsync } from "@/hooks/useAsync";
-import { ApiError, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { cx, timeAgo } from "@/lib/format";
 import { brandStyle } from "@/lib/theme";
-import type { Macro, Webhook, WorkspaceSettings } from "@/lib/types";
+import type { Macro, UserRole, TeamMember, Webhook, WorkspaceSettings } from "@/lib/types";
 
-type Tab = "workspace" | "widget" | "webhooks" | "macros";
+type Tab = "workspace" | "widget" | "webhooks" | "macros" | "team";
 
 const TABS: { key: Tab; label: string; icon: typeof Palette }[] = [
   { key: "workspace", label: "Workspace & AI", icon: SlidersHorizontal },
   { key: "widget", label: "Install widget", icon: Code2 },
   { key: "webhooks", label: "Webhooks & Slack", icon: WebhookIcon },
   { key: "macros", label: "Macros", icon: MessageSquareQuote },
+  { key: "team", label: "Team", icon: Users },
 ];
 
 export function SettingsManager() {
   const [tab, setTab] = useState<Tab>("workspace");
+  const { isAdmin } = useAuth();
+  if (!isAdmin) return <ErrorNotice error={{ status: 403 }} />;
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-6xl p-6">
         <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
         <p className="text-sm text-slate-500">Brand the assistant, tune AI policies, install the widget and connect your tools. Changes apply instantly.</p>
-        <div className="mt-5 flex gap-1 overflow-x-auto border-b border-slate-200">
+        <div role="tablist" aria-label="Settings sections" className="mt-5 flex gap-1 overflow-x-auto border-b border-slate-200">
           {TABS.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
+              role="tab"
+              aria-selected={tab === key}
               onClick={() => setTab(key)}
               className={cx(
                 "-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition",
@@ -60,6 +71,7 @@ export function SettingsManager() {
           {tab === "widget" && <WidgetTab />}
           {tab === "webhooks" && <WebhooksTab />}
           {tab === "macros" && <MacrosTab />}
+          {tab === "team" && <TeamTab />}
         </div>
       </div>
     </div>
@@ -69,7 +81,7 @@ export function SettingsManager() {
 // ------------------------------------------------------------------ shared UI
 function Card({ title, subtitle, children, actions }: { title: string; subtitle?: string; children: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <section className="rounded-xl border border-slate-200 bg-surface p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
@@ -92,12 +104,18 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-const inputClass = "w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100";
+const inputClass = "w-full rounded-md border border-slate-200 bg-surface px-2.5 py-1.5 text-sm text-slate-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100";
 
 function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint: string }) {
   return (
-    <button type="button" onClick={() => onChange(!checked)} className="flex w-full items-start gap-3 rounded-lg p-2 text-left hover:bg-slate-50">
-      <span className={cx("mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition", checked ? "bg-brand-600" : "bg-slate-300")}>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-start gap-3 rounded-lg p-2 text-left hover:bg-slate-50"
+    >
+      <span className={cx("mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition", checked ? "bg-brand-600" : "bg-slate-300")} aria-hidden>
         <span className={cx("h-4 w-4 rounded-full bg-white shadow transition", checked && "translate-x-4")} />
       </span>
       <span>
@@ -108,41 +126,51 @@ function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange
   );
 }
 
-function StatusLine({ status }: { status: string | null }) {
-  if (!status) return null;
-  return <span className={cx("text-xs", status.startsWith("Error") ? "text-rose-600" : "text-emerald-700")}>{status}</span>;
-}
-
-function errorText(e: unknown) {
-  return `Error: ${e instanceof ApiError ? e.message : "something went wrong"}`;
+function TwoColumnSkeleton() {
+  return (
+    <LoadingRegion label="Loading settings" className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="space-y-5">
+        <CardSkeleton lines={4} />
+        <CardSkeleton lines={3} />
+      </div>
+      <CardSkeleton lines={6} />
+    </LoadingRegion>
+  );
 }
 
 // ------------------------------------------------------------------ workspace
 function WorkspaceTab() {
   const settings = useAsync(() => api.settings(), "workspace-settings");
   if (settings.error) return <ErrorNotice error={settings.error} onRetry={settings.reload} />;
-  if (!settings.data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!settings.data) return <TwoColumnSkeleton />;
   return <WorkspaceForm initial={settings.data.settings} provider={settings.data.provider} model={settings.data.model} />;
 }
 
 function WorkspaceForm({ initial, provider, model }: { initial: WorkspaceSettings; provider: string; model: string | null }) {
   const [form, setForm] = useState(initial);
   const [saved, setSaved] = useState(initial);
-  const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
   const dirty = JSON.stringify(form) !== JSON.stringify(saved);
   const set = <K extends keyof WorkspaceSettings>(key: K, value: WorkspaceSettings[K]) => setForm((f) => ({ ...f, [key]: value }));
 
+  // Warn before closing the tab with unsaved settings.
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
   const save = async () => {
     setBusy(true);
-    setStatus(null);
     try {
       const res = await api.saveSettings(form);
       setForm(res.settings);
       setSaved(res.settings);
-      setStatus("Saved — live for every new message ✓");
+      toast.success("Settings saved — live for every new message");
     } catch (e) {
-      setStatus(errorText(e));
+      toast.error(e, "Couldn't save settings.");
     } finally {
       setBusy(false);
     }
@@ -165,7 +193,7 @@ function WorkspaceForm({ initial, provider, model }: { initial: WorkspaceSetting
                   type="color"
                   value={form.accent_color}
                   onChange={(e) => set("accent_color", e.target.value)}
-                  className="h-9 w-12 cursor-pointer rounded border border-slate-200 bg-white p-0.5"
+                  className="h-9 w-12 cursor-pointer rounded border border-slate-200 bg-surface p-0.5"
                   aria-label="Accent colour picker"
                 />
                 <input className={cx(inputClass, "font-mono")} value={form.accent_color} onChange={(e) => set("accent_color", e.target.value)} />
@@ -243,15 +271,15 @@ function WorkspaceForm({ initial, provider, model }: { initial: WorkspaceSetting
       </div>
 
       <div className="space-y-3 lg:sticky lg:top-0 lg:self-start">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-surface p-4">
           <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <Palette className="h-3.5 w-3.5" /> Live preview
           </p>
           <ChatPreview settings={form} />
         </div>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-          <StatusLine status={status} />
-          <div className="ml-auto flex gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-surface p-3">
+          <span className={cx("whitespace-nowrap text-xs", dirty ? "font-medium text-amber-700" : "text-slate-500")}>{dirty ? "Unsaved changes" : "All changes saved"}</span>
+          <div className="ml-auto flex gap-2 whitespace-nowrap">
             <button
               onClick={() => setForm(saved)}
               disabled={!dirty || busy}
@@ -275,30 +303,32 @@ function WorkspaceForm({ initial, provider, model }: { initial: WorkspaceSetting
 
 function ChatPreview({ settings }: { settings: WorkspaceSettings }) {
   return (
-    <div style={brandStyle(settings.accent_color)} className="overflow-hidden rounded-xl border border-slate-200">
+    // force-light: customers always see the widget in light mode, so the preview does too.
+    <div style={brandStyle(settings.accent_color)} className="force-light overflow-hidden rounded-xl border border-slate-200 bg-surface">
+      <span className="sr-only">Preview of the customer chat widget</span>
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2.5">
         <LogoMark className="h-7 w-7" />
         <div className="min-w-0">
           <div className="truncate text-xs font-semibold text-slate-900">
             {settings.assistant_name} · {settings.company_name}
           </div>
-          <div className="text-[10px] text-slate-500">AI assistant · human help anytime</div>
+          <div className="text-[11px] text-slate-500">AI assistant · human help anytime</div>
         </div>
       </div>
       <div className="space-y-2 bg-slate-50 p-3 text-xs">
         <p className="text-center text-slate-600">{settings.welcome_message}</p>
         <div className="flex flex-wrap justify-center gap-1">
           {settings.suggested_prompts.filter(Boolean).map((p) => (
-            <span key={p} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700">
+            <span key={p} className="rounded-full border border-slate-200 bg-surface px-2 py-0.5 text-[11px] text-slate-700">
               {p}
             </span>
           ))}
         </div>
         <div className="ml-auto w-fit rounded-2xl rounded-br-md bg-brand-600 px-2.5 py-1.5 text-white">Please cancel my order</div>
-        <div className="w-fit max-w-[85%] rounded-2xl rounded-bl-md border border-slate-200 bg-white px-2.5 py-1.5 text-slate-700">
+        <div className="w-fit max-w-[85%] rounded-2xl rounded-bl-md border border-slate-200 bg-surface px-2.5 py-1.5 text-slate-700">
           I can cancel <b>ORD-10460</b> right now. Reply <b>yes</b> to confirm.
         </div>
-        <span className="inline-flex rounded-full bg-brand-600 px-2.5 py-1 text-[10px] font-medium text-white">Yes, cancel order</span>
+        <span className="inline-flex rounded-full bg-brand-600 px-2.5 py-1 text-[11px] font-medium text-white">Yes, cancel order</span>
       </div>
     </div>
   );
@@ -312,6 +342,7 @@ function WidgetTab() {
   const [position, setPosition] = useState<"right" | "left">("right");
   const [openByDefault, setOpenByDefault] = useState(false);
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
 
   const attrs = [position === "left" ? ' data-position="left"' : "", openByDefault ? ' data-open="true"' : ""].join("");
   const snippet = `<script src="${origin}/widget.js"${attrs} async></script>`;
@@ -322,14 +353,14 @@ function WidgetTab() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard blocked */
+      toast.error("Your browser blocked clipboard access — select the snippet and copy it manually.");
     }
   };
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
       <Card title="Add Relay to any website" subtitle="Paste this tag before </body> on your storefront, help center or app. No build step or dependency.">
-        <div className="relative overflow-x-auto rounded-lg bg-ink-950 p-4 pr-24 font-mono text-[13px] text-slate-100">
+        <div className="relative overflow-x-auto rounded-lg bg-ink-950 p-4 pr-24 font-mono text-[13px] text-white/90">
           <code className="whitespace-pre">{snippet}</code>
           <button
             onClick={() => void copy()}
@@ -382,27 +413,30 @@ function WidgetTab() {
 
 // ------------------------------------------------------------------ webhooks
 function WebhooksTab() {
-  const data = useAsync(() => api.webhooks(), "webhooks", 10000);
+  const data = useAsync(() => api.webhooks(), "webhooks", 10000, ["webhooks"]);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [kind, setKind] = useState<Webhook["kind"]>("slack");
   const [events, setEvents] = useState<string[]>(["ticket.created", "sla.breached", "action.approval_requested"]);
-  const [status, setStatus] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const toast = useToast();
 
   if (data.error) return <ErrorNotice error={data.error} onRetry={data.reload} />;
-  if (!data.data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data.data) return <TwoColumnSkeleton />;
   const catalog = data.data.events;
 
   const create = async () => {
-    setStatus(null);
+    setCreating(true);
     try {
       await api.createWebhook({ name: name.trim() || (kind === "slack" ? "Slack alerts" : "Webhook"), url: url.trim(), kind, events });
       setName("");
       setUrl("");
-      setStatus("Webhook added ✓");
+      toast.success("Webhook added");
       data.reload();
     } catch (e) {
-      setStatus(errorText(e));
+      toast.error(e, "Couldn't add the webhook.");
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -431,7 +465,7 @@ function WebhooksTab() {
                   <button
                     key={k}
                     onClick={() => setKind(k)}
-                    className={cx("rounded-md py-1 text-xs font-medium", kind === k ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")}
+                    className={cx("rounded-md py-1 text-xs font-medium", kind === k ? "bg-surface text-slate-900 shadow-sm" : "text-slate-600")}
                   >
                     {k === "slack" ? "Slack" : "Generic JSON"}
                   </button>
@@ -468,10 +502,10 @@ function WebhooksTab() {
               </div>
             </Field>
             <div className="flex items-center justify-between gap-2">
-              <StatusLine status={status} />
+              {url.trim() && !/^https?:\/\/\S+$/.test(url.trim()) && <span className="text-xs text-rose-600">Enter a full http(s) URL</span>}
               <button
                 onClick={() => void create()}
-                disabled={!/^https?:\/\/\S+$/.test(url.trim()) || events.length === 0}
+                disabled={creating || !/^https?:\/\/\S+$/.test(url.trim()) || events.length === 0}
                 className="ml-auto flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-40"
               >
                 <Plus className="h-3.5 w-3.5" /> Add
@@ -525,47 +559,88 @@ function WebhooksTab() {
 
 function WebhookRow({ hook, catalog, onChanged }: { hook: Webhook; catalog: Record<string, string>; onChanged: () => void }) {
   const [showSecret, setShowSecret] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const toast = useToast();
+  const dialog = useDialog();
 
   const test = async () => {
-    setNote("Sending…");
+    setTesting(true);
     try {
       const d = await api.testWebhook(hook.id);
-      setNote(d.ok ? `Test delivered (${d.status_code}) ✓` : `Error: ${d.error ?? d.status_code}`);
+      if (d.ok) toast.success(`Test event delivered to ${hook.name} (${d.status_code})`);
+      else toast.error(`Test delivery to ${hook.name} failed: ${d.error ?? d.status_code}`);
     } catch (e) {
-      setNote(errorText(e));
+      toast.error(e, "Couldn't send the test event.");
+    } finally {
+      setTesting(false);
     }
     onChanged();
+  };
+
+  const toggle = async () => {
+    try {
+      await api.updateWebhook(hook.id, { active: !hook.active });
+      toast.success(hook.active ? `${hook.name} paused` : `${hook.name} resumed`);
+      onChanged();
+    } catch (e) {
+      toast.error(e, "Couldn't update the webhook.");
+    }
+  };
+
+  const remove = async () => {
+    const ok = await dialog.confirm({
+      title: `Delete "${hook.name}"?`,
+      body: "Relay stops sending events to this endpoint immediately.",
+      confirmLabel: "Delete webhook",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      await api.deleteWebhook(hook.id);
+      toast.success("Webhook deleted");
+      onChanged();
+    } catch (e) {
+      toast.error(e, "Couldn't delete the webhook.");
+    }
   };
 
   return (
     <li className="rounded-lg border border-slate-200 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={cx("rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase", hook.kind === "slack" ? "bg-fuchsia-50 text-fuchsia-700" : "bg-slate-100 text-slate-700")}>
+        <span className={cx("rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase", hook.kind === "slack" ? "bg-fuchsia-50 text-fuchsia-700" : "bg-slate-100 text-slate-700")}>
           {hook.kind}
         </span>
         <span className="text-sm font-medium text-slate-900">{hook.name}</span>
         <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-slate-500">{hook.url}</span>
         <button
-          onClick={() => void api.updateWebhook(hook.id, { active: !hook.active }).then(onChanged)}
+          role="switch"
+          aria-checked={hook.active}
+          aria-label={`${hook.name} delivery`}
+          title={hook.active ? "Click to pause" : "Click to resume"}
+          onClick={() => void toggle()}
           className={cx("rounded-full px-2 py-0.5 text-[11px] font-medium", hook.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500")}
         >
           {hook.active ? "Active" : "Paused"}
         </button>
-        <button onClick={() => void test()} className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-700 hover:bg-slate-50">
-          <Send className="h-3 w-3" /> Test
+        <button
+          onClick={() => void test()}
+          disabled={testing}
+          className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          <Send className="h-3 w-3" aria-hidden /> {testing ? "Sending…" : "Test"}
         </button>
         <button
-          onClick={() => window.confirm(`Delete "${hook.name}"?`) && void api.deleteWebhook(hook.id).then(onChanged)}
-          className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-          aria-label="Delete webhook"
+          onClick={() => void remove()}
+          className="rounded-md p-1 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+          aria-label={`Delete webhook ${hook.name}`}
+          title="Delete webhook"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
       <div className="mt-2 flex flex-wrap gap-1">
         {hook.events.map((e) => (
-          <span key={e} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600" title={catalog[e]}>
+          <span key={e} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600" title={catalog[e]}>
             {e}
           </span>
         ))}
@@ -574,12 +649,16 @@ function WebhookRow({ hook, catalog, onChanged }: { hook: Webhook; catalog: Reco
         <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
           Signing secret
           <code className="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-slate-700">{showSecret ? hook.secret : "whsec_••••••••••••"}</code>
-          <button onClick={() => setShowSecret((v) => !v)} className="text-slate-400 hover:text-slate-700" aria-label="Toggle secret">
+          <button
+            onClick={() => setShowSecret((v) => !v)}
+            className="text-slate-500 hover:text-slate-700"
+            aria-label={showSecret ? "Hide signing secret" : "Show signing secret"}
+            aria-pressed={showSecret}
+          >
             {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           </button>
         </div>
       )}
-      {note && <p className={cx("mt-1.5 text-[11px]", note.startsWith("Error") ? "text-rose-600" : "text-emerald-700")}>{note}</p>}
     </li>
   );
 }
@@ -588,22 +667,40 @@ function WebhookRow({ hook, catalog, onChanged }: { hook: Webhook; catalog: Reco
 const VARIABLES = ["{first_name}", "{order_id}", "{ticket_id}", "{agent_name}", "{company_name}"];
 
 function MacrosTab() {
-  const macros = useAsync(() => api.macros(), "macros");
+  const macros = useAsync(() => api.macros(), "macros", undefined, ["macros"]);
   const [editing, setEditing] = useState<Pick<Macro, "title" | "body"> & { id?: string } | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+  const dialog = useDialog();
 
   if (macros.error) return <ErrorNotice error={macros.error} onRetry={macros.reload} />;
 
   const save = async () => {
     if (!editing) return;
+    setSaving(true);
     try {
       if (editing.id) await api.updateMacro(editing.id, editing.title, editing.body);
       else await api.createMacro(editing.title, editing.body);
       setEditing(null);
-      setStatus("Macro saved ✓");
+      toast.success("Macro saved");
       macros.reload();
     } catch (e) {
-      setStatus(errorText(e));
+      toast.error(e, "Couldn't save the macro.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (m: Macro) => {
+    const ok = await dialog.confirm({ title: `Delete "${m.title}"?`, body: "Specialists won't be able to insert it any more.", confirmLabel: "Delete macro", tone: "danger" });
+    if (!ok) return;
+    try {
+      await api.deleteMacro(m.id);
+      if (editing?.id === m.id) setEditing(null);
+      toast.success("Macro deleted");
+      macros.reload();
+    } catch (e) {
+      toast.error(e, "Couldn't delete the macro.");
     }
   };
 
@@ -621,6 +718,16 @@ function MacrosTab() {
           </button>
         }
       >
+        {!macros.data && (
+          <LoadingRegion label="Loading macros" className="space-y-4 py-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-3.5 w-1/3" />
+                <Skeleton className="h-3 w-4/5" />
+              </div>
+            ))}
+          </LoadingRegion>
+        )}
         <ul className="divide-y divide-slate-100">
           {(macros.data ?? []).map((m) => (
             <li key={m.id} className="flex items-start gap-3 py-3">
@@ -632,9 +739,10 @@ function MacrosTab() {
                 Edit
               </button>
               <button
-                onClick={() => window.confirm(`Delete "${m.title}"?`) && void api.deleteMacro(m.id).then(macros.reload)}
-                className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                aria-label="Delete macro"
+                onClick={() => void remove(m)}
+                className="rounded-md p-1 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+                aria-label={`Delete macro ${m.title}`}
+                title="Delete macro"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -644,7 +752,7 @@ function MacrosTab() {
         </ul>
       </Card>
 
-      <Card title={editing?.id ? "Edit macro" : editing ? "New macro" : "Editor"} actions={<StatusLine status={status} />}>
+      <Card title={editing?.id ? "Edit macro" : editing ? "New macro" : "Editor"}>
         {editing ? (
           <div className="space-y-3">
             <Field label="Title">
@@ -670,7 +778,7 @@ function MacrosTab() {
               </button>
               <button
                 onClick={() => void save()}
-                disabled={!editing.title.trim() || !editing.body.trim()}
+                disabled={saving || !editing.title.trim() || !editing.body.trim()}
                 className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-40"
               >
                 Save
@@ -681,6 +789,207 @@ function MacrosTab() {
           <p className="text-xs text-slate-500">Select a macro to edit, or create a new one. Available variables: {VARIABLES.join(", ")}.</p>
         )}
       </Card>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ team
+const ROLE_HELP: Record<UserRole, string> = {
+  agent: "Works tickets, approves actions, edits the knowledge base",
+  admin: "Everything agents can do, plus settings, webhooks, macros and the team",
+};
+
+function TeamTab() {
+  const { mode, user: me } = useAuth();
+  const members = useAsync(() => api.users(), "team", undefined, ["users"]);
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<UserRole>("agent");
+  const [inviting, setInviting] = useState(false);
+  const toast = useToast();
+  const dialog = useDialog();
+  const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+
+  if (members.error) return <ErrorNotice error={members.error} onRetry={members.reload} />;
+
+  const invite = async () => {
+    setInviting(true);
+    try {
+      const created = await api.inviteUser(email.trim(), role);
+      toast.success(`${created.email} can now sign in with Google as ${created.role === "admin" ? "an admin" : "an agent"}`);
+      setEmail("");
+      members.reload();
+    } catch (e) {
+      toast.error(e, "Couldn't invite them.");
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const change = async (m: TeamMember, patch: { role?: UserRole; status?: "active" | "disabled" }, success: string) => {
+    if (patch.status === "disabled") {
+      const ok = await dialog.confirm({
+        title: `Remove ${m.name ?? m.email}'s access?`,
+        body: "They're signed out everywhere immediately and can't sign back in until you restore access.",
+        confirmLabel: "Disable access",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    try {
+      await api.updateUser(m.id, patch);
+      toast.success(success);
+      members.reload();
+    } catch (e) {
+      toast.error(e, "Couldn't update the team member.");
+    }
+  };
+
+  const remove = async (m: TeamMember) => {
+    const ok = await dialog.confirm({
+      title: `Remove ${m.name ?? m.email} from the team?`,
+      body: "Their past replies keep their name. To let them back in you'll need to invite them again.",
+      confirmLabel: "Remove",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      await api.removeUser(m.id);
+      toast.success("Removed from the team");
+      members.reload();
+    } catch (e) {
+      toast.error(e, "Couldn't remove them.");
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {mode !== "google" && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          Google sign-in is off, so the console is open to anyone who can reach it. Set <code className="font-mono">RELAY_GOOGLE_CLIENT_ID</code> and{" "}
+          <code className="font-mono">RELAY_AUTH_ADMIN_EMAILS</code> in <code className="font-mono">backend/.env</code> to require sign-in; this team list is used
+          once it&apos;s on.
+        </p>
+      )}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <Card title="Team members" subtitle="People who can sign in to this console with Google.">
+          {!members.data ? (
+            <LoadingRegion label="Loading team" className="space-y-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-1/3" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </LoadingRegion>
+          ) : members.data.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">No one yet. Invite your first teammate.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {members.data.map((m) => {
+                const isMe = m.id === me?.id;
+                const label = m.name ?? m.email;
+                return (
+                  <li key={m.id} className={cx("flex flex-wrap items-center gap-3 py-3", m.status === "disabled" && "opacity-60")}>
+                    {m.picture ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.picture} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-full object-cover" />
+                    ) : (
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600" aria-hidden>
+                        {label[0]?.toUpperCase()}
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-900">
+                        {label} {isMe && <span className="text-xs font-normal text-slate-500">(you)</span>}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">
+                        {m.name ? `${m.email} · ` : ""}
+                        {m.status === "invited" ? "Invited — hasn't signed in yet" : m.status === "disabled" ? "Access disabled" : `Last active ${timeAgo(m.last_login_at)}`}
+                      </p>
+                    </div>
+                    <select
+                      value={m.role}
+                      disabled={isMe}
+                      onChange={(e) => void change(m, { role: e.target.value as UserRole }, `${label} is now ${e.target.value === "admin" ? "an admin" : "an agent"}`)}
+                      className="rounded-md border border-slate-200 bg-surface px-2 py-1 text-xs text-slate-700 disabled:opacity-60"
+                      aria-label={`UserRole for ${label}`}
+                      title={isMe ? "You can't change your own role" : ROLE_HELP[m.role]}
+                    >
+                      <option value="agent">Agent</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    {!isMe &&
+                      (m.status === "disabled" ? (
+                        <button
+                          onClick={() => void change(m, { status: "active" }, `${label}'s access restored`)}
+                          className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                        >
+                          Restore
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => void change(m, { status: "disabled" }, `${label}'s access disabled`)}
+                          className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                        >
+                          Disable
+                        </button>
+                      ))}
+                    {!isMe && (
+                      <button
+                        onClick={() => void remove(m)}
+                        className="rounded-md p-1 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+                        aria-label={`Remove ${label}`}
+                        title="Remove from team"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="Invite someone" subtitle="They sign in with the Google account for this email.">
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (validEmail) void invite();
+            }}
+          >
+            <Field label="Email">
+              <input type="email" className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="teammate@company.com" autoComplete="off" />
+            </Field>
+            <fieldset>
+              <legend className="text-xs font-medium text-slate-700">UserRole</legend>
+              <div className="mt-1 space-y-1.5">
+                {(["agent", "admin"] as const).map((r) => (
+                  <label key={r} className={cx("flex cursor-pointer items-start gap-2 rounded-lg border p-2.5", role === r ? "border-brand-300 bg-brand-50" : "border-slate-200")}>
+                    <input type="radio" name="invite-role" className="mt-0.5 accent-brand-600" checked={role === r} onChange={() => setRole(r)} />
+                    <span>
+                      <span className="block text-sm font-medium text-slate-800">{r === "admin" ? "Admin" : "Agent"}</span>
+                      <span className="block text-xs text-slate-500">{ROLE_HELP[r]}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <button
+              type="submit"
+              disabled={!validEmail || inviting}
+              className="flex w-full items-center justify-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-40"
+            >
+              <UserPlus className="h-4 w-4" aria-hidden /> Send invite
+            </button>
+            <p className="text-[11px] text-slate-500">No email is sent — share the console link with them. They get in the first time they sign in with Google.</p>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }

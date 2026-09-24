@@ -42,7 +42,7 @@ const PRIORITY_TONES: Record<string, string> = {
 
 export function PriorityPill({ priority }: { priority: string }) {
   return (
-    <span className={cx("rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide", PRIORITY_TONES[priority] ?? PRIORITY_TONES.low)}>
+    <span className={cx("rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide", PRIORITY_TONES[priority] ?? PRIORITY_TONES.low)}>
       {priority}
     </span>
   );

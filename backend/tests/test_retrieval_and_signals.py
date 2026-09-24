@@ -58,6 +58,21 @@ def test_hard_triggers_and_sentiment():
     assert detect_sentiment("thanks, that was helpful") == "positive"
 
 
+@pytest.mark.parametrize("text", [
+    "My tent pole snapped and cut my hand",
+    "the stove sparked and my son got hurt",
+    "I'm bleeding from the zipper",
+    "the heater gave me an electric shock",
+])
+def test_everyday_injury_reports_trigger_safety(text):
+    assert "safety" in detect_signals(text)["hard_triggers"]
+
+
+@pytest.mark.parametrize("text", ["please cut my order in half", "the price hurt my wallet", "my back order is late"])
+def test_safety_trigger_ignores_non_injuries(text):
+    assert "safety" not in detect_signals(text)["hard_triggers"]
+
+
 def test_confidence_blending():
     high, _ = score_confidence(intent="order_status", intent_confidence=0.9, retrieval_confidence=0.3, grounded=True,
                                generation_confidence=0.9, sentiment="neutral", action="answer")

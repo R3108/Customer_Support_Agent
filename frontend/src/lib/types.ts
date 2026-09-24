@@ -145,7 +145,140 @@ export interface CustomerSummary {
   member_since: string;
   rewards_points: number;
   recent_orders: { order_id: string; placed_at: string; status: string; total: number; items: string }[];
+  health?: CustomerHealth | null;
 }
+
+export type RiskLevel = "low" | "medium" | "high";
+
+export interface CustomerHealth {
+  customer_id: string;
+  score: number;
+  risk: RiskLevel;
+  factors: { label: string; impact: number }[];
+  lifetime_value: number;
+  window_days: number;
+}
+
+export interface AtRiskCustomer extends CustomerHealth {
+  name: string;
+  tier: string;
+  latest_conversation_id: string | null;
+}
+
+export interface CustomerHealthReport {
+  customers: AtRiskCustomer[];
+  revenue_at_risk: number;
+  high_risk: number;
+}
+
+export interface PulseIssue {
+  id: string;
+  kind: "intent" | "sentiment" | "escalation";
+  key: string;
+  label: string;
+  current: number;
+  baseline_avg: number;
+  /** null when the issue is new: nothing like it in the baseline week. */
+  ratio: number | null;
+  severity: "medium" | "high";
+  /** Conversations per day, oldest first; the last value is the past 24 hours. */
+  series: number[];
+  examples: string[];
+}
+
+export interface PulseReport {
+  window_hours: number;
+  baseline_days: number;
+  warming_up: boolean;
+  issues: PulseIssue[];
+  generated_at: string;
+}
+
+// ------------------------------------------------------------------ Test Lab
+export interface EvalExpectations {
+  intent?: string;
+  escalated?: boolean;
+  escalation_reason?: string;
+  action_type?: string;
+  action_status?: "proposed" | "executed" | "pending_approval" | "failed";
+  language?: string;
+  knowledge_gap?: boolean;
+  min_confidence?: number;
+  reply_contains?: string[];
+  reply_excludes?: string[];
+}
+
+export interface EvalCheck {
+  check: string;
+  expected: unknown;
+  actual: unknown;
+  passed: boolean;
+}
+
+export interface EvalTurn {
+  customer: string;
+  reply: string;
+  role: Role | null;
+  intent: string | null;
+  confidence: number | null;
+  route: string[] | null;
+  escalation_reason: string | null;
+}
+
+export interface EvalResult {
+  scenario_id: string;
+  name: string;
+  passed: boolean;
+  checks: EvalCheck[];
+  error: string | null;
+  turns: EvalTurn[];
+  duration_ms: number;
+  run_id?: string;
+  ran_at?: string;
+}
+
+export interface EvalScenario {
+  id: string;
+  name: string;
+  customer_id: string | null;
+  turns: string[];
+  expect: EvalExpectations;
+  source: "builtin" | "custom" | "conversation";
+  created_at: string;
+  updated_at: string;
+  last_result?: EvalResult | null;
+}
+
+export interface EvalRunSummary {
+  id: string;
+  status: "running" | "completed" | "failed";
+  total: number;
+  passed: number;
+  failed: number;
+  engine: string | null;
+  triggered_by: string | null;
+  started_at: string;
+  finished_at: string | null;
+}
+
+export interface EvalRun extends EvalRunSummary {
+  results: EvalResult[];
+}
+
+export interface EvalOverview {
+  scenarios: EvalScenario[];
+  runs: EvalRunSummary[];
+  running: boolean;
+  engine: string;
+  catalog: {
+    intents: Record<string, string>;
+    escalation_reasons: Record<string, string>;
+    action_types: Record<string, string>;
+    customers: { id: string; name: string; tier: string }[];
+  };
+}
+
+export type EvalScenarioInput = Pick<EvalScenario, "name" | "customer_id" | "turns" | "expect">;
 
 export interface AgentMemory {
   entities: Record<string, unknown>;
@@ -201,6 +334,36 @@ export interface Macro {
 }
 
 export type CopilotMode = "friendlier" | "shorter" | "formal" | "empathetic" | "fix_grammar" | "translate";
+
+/** google = Sign in with Google; api_key = X-Admin-Key header only; open = no auth (local development). */
+export type AuthMode = "google" | "api_key" | "open";
+export type UserRole = "admin" | "agent";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  picture: string | null;
+  role: UserRole;
+}
+
+export interface Me {
+  mode: AuthMode;
+  user: AuthUser | null;
+  role: UserRole | null;
+}
+
+export interface TeamMember {
+  id: string;
+  email: string;
+  name: string | null;
+  picture: string | null;
+  role: UserRole;
+  status: "invited" | "active" | "disabled";
+  invited_by: string | null;
+  created_at: string;
+  last_login_at: string | null;
+}
 
 export interface KnowledgeGap {
   id: string;

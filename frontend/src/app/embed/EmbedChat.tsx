@@ -29,7 +29,7 @@ export function EmbedChat({ customerId }: { customerId: string | null }) {
         headerExtra={
           <button
             onClick={() => window.parent.postMessage({ type: "relay:close" }, "*")}
-            className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
             aria-label="Close chat"
             title="Close"
           >

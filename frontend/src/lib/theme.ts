@@ -2,6 +2,14 @@ import type { CSSProperties } from "react";
 
 export const DEFAULT_ACCENT = "#4f46e5";
 
+export const THEME_KEY = "relay.theme";
+
+/**
+ * Inlined in the root layout so the theme class is set before first paint (no light flash for dark-mode users).
+ * Keep in sync with `apply()` in hooks/useTheme.ts.
+ */
+export const THEME_BOOT_SCRIPT = `try{var p=localStorage.getItem("${THEME_KEY}")||"system";var d=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("theme-dark",d)}catch(e){}`;
+
 /** CSS variables that re-tint every `brand-*` utility inside the element from one accent colour. */
 export function brandStyle(accent: string | null | undefined): CSSProperties | undefined {
   if (!accent || !/^#[0-9a-f]{6}$/i.test(accent) || accent.toLowerCase() === DEFAULT_ACCENT) return undefined;

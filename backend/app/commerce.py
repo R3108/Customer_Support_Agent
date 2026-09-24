@@ -8,6 +8,9 @@ including the ownership / verification checks.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import date
 from functools import lru_cache
 from typing import Any
@@ -18,6 +21,29 @@ from .config import get_settings
 TODAY = date(2026, 9, 15)  # mock data is generated relative to this date
 FINAL_SALE_SKUS = {"GIFT-CARD"}
 
+# Test Lab runs see pristine source orders and keep their changes in this private, in-memory overlay,
+# so a test can cancel an order without touching the real one (and real changes can't break a test).
+# A ContextVar is visible to every agent node of the run and to nothing else.
+_sandbox_patches: ContextVar[dict[str, dict[str, Any]] | None] = ContextVar("relay_sandbox_orders", default=None)
+
+
+@contextmanager
+def sandboxed_orders() -> Iterator[None]:
+    token = _sandbox_patches.set({})
+    try:
+        yield
+    finally:
+        _sandbox_patches.reset(token)
+
+
+def in_sandbox() -> bool:
+    return _sandbox_patches.get() is not None
+
+
+def _patches() -> dict[str, dict[str, Any]]:
+    overlay = _sandbox_patches.get()
+    return overlay if overlay is not None else db.order_patches()
+
 
 @lru_cache
 def _load(name: str) -> list[dict[str, Any]]:
@@ -27,14 +53,17 @@ def _load(name: str) -> list[dict[str, Any]]:
 
 def _orders() -> list[dict[str, Any]]:
     """Source orders with changes made by actions (cancellations, returns, refunds) layered on top."""
-    patches = db.order_patches()
+    patches = _patches()
     return [{**o, **patches[o["id"]]} if o["id"] in patches else o for o in _load("orders")]
 
 
 def update_order(order_id: str, **fields: Any) -> dict[str, Any]:
-    patch = db.order_patches().get(order_id, {})
-    patch.update(fields)
-    db.save_order_patch(order_id, patch)
+    patch = {**_patches().get(order_id, {}), **fields}
+    overlay = _sandbox_patches.get()
+    if overlay is not None:
+        overlay[order_id] = patch
+    else:
+        db.save_order_patch(order_id, patch)
     return get_order(order_id)  # type: ignore[return-value]
 
 

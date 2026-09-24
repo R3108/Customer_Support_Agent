@@ -1,12 +1,16 @@
 "use client";
 
-import { AlarmClock, Bot, Download, Gauge, Globe, Headset, Lightbulb, MessagesSquare, PiggyBank, Star, Timer, Zap } from "lucide-react";
+import { AlarmClock, Bot, Download, Gauge, Globe, Headset, Lightbulb, Loader2, MessagesSquare, PiggyBank, Star, Timer, Zap } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ErrorNotice } from "@/components/AppShell";
+import { AnimatedValue } from "@/components/fx/AnimatedValue";
+import { CardSkeleton, LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import { useAsync } from "@/hooks/useAsync";
 import { api, downloadExport } from "@/lib/api";
 import { cx, humanize, languageName, money, pct } from "@/lib/format";
+import { AtRiskPanel, PulsePanel } from "./InsightPanels";
 
 function minutes(value: number | null): string {
   if (value === null) return "—";
@@ -15,15 +19,44 @@ function minutes(value: number | null): string {
   return `${(value / 1440).toFixed(1)}d`;
 }
 
-export function AnalyticsDashboard() {
-  const { data, error, reload } = useAsync(() => api.analytics(), "analytics", 10000);
-  const [exportError, setExportError] = useState<string | null>(null);
-  if (error) return <ErrorNotice error={error} onRetry={reload} />;
-  if (!data) return <div className="p-8 text-sm text-slate-500">Loading…</div>;
+function AnalyticsSkeleton() {
+  return (
+    <LoadingRegion label="Loading analytics" className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      <div className="space-y-2">
+        <Skeleton className="h-6 w-56" />
+        <Skeleton className="h-4 w-96 max-w-full" />
+      </div>
+      <Skeleton className="h-36 rounded-2xl" />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        {Array.from({ length: 6 }, (_, i) => (
+          <CardSkeleton key={i} lines={1} className="p-4" />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {Array.from({ length: 4 }, (_, i) => (
+          <CardSkeleton key={i} lines={5} />
+        ))}
+      </div>
+    </LoadingRegion>
+  );
+}
 
-  const exportCsv = (kind: "tickets" | "conversations") => {
-    setExportError(null);
-    downloadExport(kind).catch((e: Error) => setExportError(e.message));
+export function AnalyticsDashboard() {
+  const { data, error, reload } = useAsync(() => api.analytics(), "analytics", 10000, ["tickets", "conversations", "messages", "actions"]);
+  const [exporting, setExporting] = useState<string | null>(null);
+  const toast = useToast();
+  if (error) return <ErrorNotice error={error} onRetry={reload} />;
+  if (!data) return <AnalyticsSkeleton />;
+
+  const exportCsv = async (kind: "tickets" | "conversations") => {
+    setExporting(kind);
+    try {
+      await downloadExport(kind);
+    } catch (e) {
+      toast.error(e, "Couldn't export the CSV.");
+    } finally {
+      setExporting(null);
+    }
   };
 
   const kpis = [
@@ -37,34 +70,36 @@ export function AnalyticsDashboard() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-6xl space-y-6 p-6">
+      <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold text-slate-900">Support analytics</h1>
-            <p className="text-sm text-slate-500">How Relay is performing across conversations, confidence and escalations. Refreshes every 10s.</p>
+            <p className="text-sm text-slate-500">How Relay is performing across conversations, confidence and escalations. Updates live.</p>
           </div>
           <div className="flex items-center gap-2">
-            {exportError && <span className="text-xs text-rose-600">{exportError}</span>}
             {(["tickets", "conversations"] as const).map((kind) => (
               <button
                 key={kind}
-                onClick={() => exportCsv(kind)}
-                className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                onClick={() => void exportCsv(kind)}
+                disabled={exporting !== null}
+                className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-surface px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                <Download className="h-3.5 w-3.5" /> {humanize(kind)} CSV
+                {exporting === kind ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Download className="h-3.5 w-3.5" aria-hidden />} {humanize(kind)} CSV
               </button>
             ))}
           </div>
         </div>
 
-        <section className="relative overflow-hidden rounded-2xl bg-ink-950 p-6 text-white">
+        <section className="relative overflow-hidden rounded-2xl bg-ink-950 p-6 text-white ring-1 ring-inset ring-white/10">
           <div className="bg-grid absolute inset-0 opacity-60" />
           <div className="relative grid gap-6 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
             <div>
-              <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-brand-200">
+              <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-indigo-200">
                 <PiggyBank className="h-4 w-4" /> Estimated savings
               </p>
-              <p className="mt-2 text-4xl font-semibold tracking-tight">{money(data.roi.cost_saved)}</p>
+              <p className="mt-2 text-4xl font-semibold tracking-tight">
+                <AnimatedValue value={money(data.roi.cost_saved)} duration={1400} />
+              </p>
               <p className="mt-1 text-xs text-slate-400">
                 {data.roi.handled_by_ai} tickets handled without a human × {data.roi.minutes_per_human_ticket} min × {money(data.roi.cost_per_agent_hour)}/h ·{" "}
                 <Link href="/settings" className="underline decoration-slate-600 underline-offset-2 hover:text-white">
@@ -78,13 +113,20 @@ export function AnalyticsDashboard() {
           </div>
         </section>
 
+        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <PulsePanel />
+          <AtRiskPanel />
+        </div>
+
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           {kpis.map(({ label, value, sub, icon: Icon }) => (
-            <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div key={label} className="rounded-xl border border-slate-200 bg-surface p-4">
               <div className="flex items-center gap-1.5 text-xs text-slate-500">
                 <Icon className="h-3.5 w-3.5" /> {label}
               </div>
-              <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{value}</div>
+              <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                <AnimatedValue value={value} />
+              </div>
               <div className="mt-0.5 text-[11px] text-slate-500">{sub}</div>
             </div>
           ))}
@@ -150,7 +192,9 @@ function HeroStat({ label, value, sub }: { label: string; value: string; sub?: s
   return (
     <div className="border-white/10 md:border-l md:pl-6">
       <p className="text-xs text-slate-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight">
+        <AnimatedValue value={value} />
+      </p>
       {sub && <p className="mt-1 text-[11px] text-slate-400">{sub}</p>}
     </div>
   );
@@ -162,14 +206,16 @@ function MiniStat({ icon: Icon, label, value, tone }: { icon: typeof Globe; labe
       <div className="flex items-center gap-1 text-[11px] text-slate-500">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
-      <div className={cx("mt-1 text-lg font-semibold", tone === "amber" ? "text-amber-800" : "text-slate-900")}>{value}</div>
+      <div className={cx("mt-1 text-lg font-semibold", tone === "amber" ? "text-amber-800" : "text-slate-900")}>
+        <AnimatedValue value={value} />
+      </div>
     </div>
   );
 }
 
 function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <section className="rounded-xl border border-slate-200 bg-surface p-5">
       <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
       <p className="mb-4 text-xs text-slate-500">{subtitle}</p>
       {children}
@@ -183,11 +229,11 @@ function HBars({ data, format = (s: string) => s }: { data: Record<string, numbe
   if (!entries.length) return <p className="text-xs text-slate-500">No data yet.</p>;
   return (
     <ul className="space-y-2">
-      {entries.map(([k, v]) => (
-        <li key={k} className="grid grid-cols-[140px_1fr_32px] items-center gap-3 text-xs">
+      {entries.map(([k, v], i) => (
+        <li key={k} className="grid grid-cols-[minmax(0,110px)_1fr_32px] items-center gap-3 text-xs sm:grid-cols-[140px_1fr_32px]">
           <span className="truncate text-slate-600">{format(k)}</span>
           <div className="h-2 rounded-full bg-slate-100">
-            <div className="h-2 rounded-full bg-brand-500" style={{ width: `${(v / max) * 100}%` }} />
+            <div className="bar-x h-2 rounded-full bg-brand-500" style={{ width: `${(v / max) * 100}%`, "--i": i } as React.CSSProperties} />
           </div>
           <span className="text-right font-mono text-slate-700">{v}</span>
         </li>
@@ -202,10 +248,13 @@ function VBars({ data, colors, suffix = "" }: { data: Record<string, number>; co
   if (!entries.length) return <p className="text-xs text-slate-500">No data yet.</p>;
   return (
     <div className="flex h-40 items-end gap-3">
-      {entries.map(([k, v]) => (
+      {entries.map(([k, v], i) => (
         <div key={k} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
           <span className="font-mono text-[11px] text-slate-700">{v}</span>
-          <div className={cx("w-full max-w-14 rounded-t-md", colors[k] ?? "bg-brand-500")} style={{ height: `${Math.max((v / max) * 100, 2)}%` }} />
+          <div
+            className={cx("bar-y w-full max-w-14 rounded-t-md", colors[k] ?? "bg-brand-500")}
+            style={{ height: `${Math.max((v / max) * 100, 2)}%`, "--i": i } as React.CSSProperties}
+          />
           <span className="text-[11px] text-slate-500">
             {humanize(k)}
             {suffix}
