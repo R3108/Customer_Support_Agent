@@ -1,16 +1,21 @@
 import {
   ArrowRight,
+  ArrowUp,
   BarChart3,
   BookOpen,
   Brain,
-  Check,
   Code2,
+  EyeOff,
+  FileLock2,
+  Fingerprint,
   Gauge,
   Globe,
   Headset,
   Lightbulb,
   LockKeyhole,
   MessageSquareText,
+  ScrollText,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Wand2,
@@ -18,14 +23,24 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { ChatWidget } from "@/components/ChatWidget";
 import { AgentOrbit } from "@/components/fx/AgentOrbit";
 import { PipelineSimulator } from "@/components/fx/PipelineSimulator";
 import { Tilt } from "@/components/fx/Tilt";
-import { Logo, LogoMark } from "@/components/Logo";
+import { ConsoleShowcase } from "@/components/landing/ConsoleShowcase";
+import { Faq } from "@/components/landing/Faq";
+import { HeroPreview } from "@/components/landing/HeroPreview";
+import { InstallSteps } from "@/components/landing/InstallSteps";
+import { PricingPlans } from "@/components/landing/PricingPlans";
+import { QuestionMarquee } from "@/components/landing/QuestionMarquee";
+import { RedactionDemo } from "@/components/landing/RedactionDemo";
+import { RoiCalculator } from "@/components/landing/RoiCalculator";
+import { Logo } from "@/components/Logo";
+import { cx } from "@/lib/format";
+import { NAV } from "@/lib/nav";
 
-/** Stagger index for `.reveal` / `.route-step`. */
+/** Stagger index for `.reveal`. */
 const stagger = (i: number) => ({ "--i": i }) as CSSProperties;
 
 const AGENTS = [
@@ -68,54 +83,47 @@ const FEATURES = [
   { icon: BarChart3, title: "ROI you can show", body: "Hours and dollars saved, SLA compliance, automation rate, CSAT and CSV exports for your reporting." },
 ];
 
-const PLANS = [
-  {
-    name: "Starter",
-    price: "$0",
-    period: "forever",
-    body: "Deterministic offline engine. Perfect for evaluation.",
-    features: ["Offline intent + RAG engine", "Embeddable widget", "Up to 3 knowledge articles", "1 agent seat"],
-    cta: "Try the demo",
-    href: "/demo",
-  },
-  {
-    name: "Growth",
-    price: "$349",
-    period: "/ month",
-    body: "LLM-powered support for growing brands.",
-    features: ["Claude or OpenAI models", "Agentic actions & approvals", "Multilingual replies", "Copilot, macros & knowledge gaps", "Slack + webhooks, 10 seats"],
-    cta: "Start 14-day trial",
-    href: "/demo",
-    featured: true,
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    period: "",
-    body: "Security reviews, SSO and dedicated success.",
-    features: ["SSO & audit logs", "Custom actions & escalation policies", "Private deployment", "99.9% uptime SLA"],
-    cta: "Talk to sales",
-    href: "/console",
-  },
+const SAFEGUARDS = [
+  { icon: EyeOff, title: "Sensitive data masked on arrival", body: "Card numbers, SSNs, security and one-time codes, PINs and passwords never reach storage, logs or a model." },
+  { icon: Fingerprint, title: "Verified ownership", body: "Order details are only revealed to the verified owner, after an email check when needed." },
+  { icon: ShieldAlert, title: "Injection-proof scope", body: "Prompt-injection and off-topic requests are caught by rules before the model ever sees them." },
+  { icon: FileLock2, title: "Export, erase & retain", body: "One-click data export and erasure requests, plus a retention policy that anonymizes old conversations." },
+  { icon: ScrollText, title: "Audit trail", body: "Approvals, setting changes and purges are recorded with who did what, and when." },
+  { icon: Webhook, title: "Signed webhooks", body: "Every outgoing event is signed, so your systems can verify it came from Relay." },
 ];
+
+const EXPLORE = [
+  { href: "#how", label: "How it works" },
+  { href: "#tour", label: "Console tour" },
+  { href: "#roi", label: "ROI calculator" },
+  { href: "#security", label: "Security" },
+  { href: "#pricing", label: "Pricing" },
+  { href: "#faq", label: "FAQ" },
+];
+
+function SectionIntro({ eyebrow, title, body, center = false }: { eyebrow: string; title: string; body?: ReactNode; center?: boolean }) {
+  return (
+    <div className={cx("reveal max-w-2xl", center && "mx-auto text-center")}>
+      <p className="text-sm font-semibold text-brand-600">{eyebrow}</p>
+      <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{title}</h2>
+      {body && <p className="mt-4 text-slate-600">{body}</p>}
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="bg-white">
+    <div id="top" className="bg-white">
       {/* Glass nav that slides in once the hero scrolls away; its bottom edge doubles as a reading-progress bar. */}
       <div className="landing-nav fixed inset-x-0 top-0 z-40 border-b border-slate-200/70 bg-white/75 backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Logo />
-          <nav className="flex items-center gap-1 text-sm sm:gap-4">
-            <a href="#how" className="hidden px-2 text-slate-600 hover:text-slate-900 sm:block">
-              How it works
-            </a>
-            <a href="#pipeline" className="hidden px-2 text-slate-600 hover:text-slate-900 sm:block">
-              See it route
-            </a>
-            <a href="#pricing" className="hidden px-2 text-slate-600 hover:text-slate-900 sm:block">
-              Pricing
-            </a>
+          <nav className="flex items-center gap-1 text-sm lg:gap-3">
+            {EXPLORE.map(({ href, label }, i) => (
+              <a key={href} href={href} className={cx("px-2 text-slate-600 hover:text-slate-900", i < 3 ? "hidden md:block" : "hidden lg:block")}>
+                {label}
+              </a>
+            ))}
             <Link href="/demo" className="btn-shine rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-500">
               Live demo
             </Link>
@@ -137,6 +145,9 @@ export default function Home() {
           <nav className="flex items-center gap-1 text-sm sm:gap-4">
             <a href="#how" className="hidden px-2 text-slate-300 hover:text-white sm:block">
               How it works
+            </a>
+            <a href="#security" className="hidden px-2 text-slate-300 hover:text-white md:block">
+              Security
             </a>
             <a href="#pricing" className="hidden px-2 text-slate-300 hover:text-white sm:block">
               Pricing
@@ -201,47 +212,17 @@ export default function Home() {
 
           {/* Product preview */}
           <div className="animate-rise [animation-delay:350ms]">
-          <Tilt max={10} restX={4} restY={-9} className="relative">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-2 shadow-2xl shadow-black/40 backdrop-blur">
-              <div className="overflow-hidden rounded-xl bg-white text-slate-900">
-                <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
-                  <LogoMark className="h-8 w-8" />
-                  <div>
-                    <div className="text-sm font-semibold">Relay · Aurora Outfitters</div>
-                    <div className="text-[11px] text-slate-500">AI assistant · human help anytime</div>
-                  </div>
-                </div>
-                <div className="space-y-3 bg-slate-50 p-4 text-sm">
-                  <div className="animate-bubble ml-auto w-fit max-w-[80%] rounded-2xl rounded-br-md bg-brand-600 px-3 py-2 text-white [animation-delay:700ms]">
-                    I want a refund for the kayak I got last week
-                  </div>
-                  <div className="animate-bubble max-w-[88%] rounded-2xl rounded-bl-md border border-amber-200 bg-white px-3 py-2 [animation-delay:1300ms]">
-                    I checked <b>ORD-10350</b> — it&apos;s within your 90-day window. Because the refund (<b>$1,248.05</b>) is over our self-service limit, a
-                    specialist needs to approve it.
-                    <div className="mt-2 rounded-md bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
-                      Ticket <b>TCK-302DCD</b> · Returns · <b>High</b> priority — reply within 4 business hours
-                    </div>
-                  </div>
-                  <div className="animate-bubble flex flex-wrap gap-1.5 text-[11px] [animation-delay:1800ms]">
-                    <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700 ring-1 ring-emerald-200">90% confidence</span>
-                    <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-slate-700">Returns & refunds</span>
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">Policy escalation</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="tilt-depth absolute -bottom-16 left-6 hidden rounded-xl border border-white/10 bg-ink-950/90 p-3 text-xs shadow-xl shadow-black/40 sm:block">
-              <div className="mb-1.5 text-slate-400">Agent route</div>
-              <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-200">
-                <span className="route-step rounded bg-white/10 px-1.5 py-0.5" style={stagger(0)}>intent</span>→
-                <span className="route-step rounded bg-white/10 px-1.5 py-0.5" style={stagger(1)}>retrieve</span>→
-                <span className="route-step rounded bg-white/10 px-1.5 py-0.5" style={stagger(2)}>support</span>→
-                <span className="route-step rounded bg-amber-500/20 px-1.5 py-0.5 text-amber-200" style={stagger(3)}>escalate</span>
-              </div>
-            </div>
-          </Tilt>
+            <HeroPreview />
           </div>
         </div>
+      </section>
+
+      {/* Questions marquee */}
+      <section aria-labelledby="marquee-title" className="border-b border-slate-200 bg-slate-50 py-10">
+        <p id="marquee-title" className="reveal mb-5 px-6 text-center text-sm font-medium text-slate-500">
+          Handles the questions your team answers all day — in 13 languages
+        </p>
+        <QuestionMarquee />
       </section>
 
       {/* Agents */}
@@ -304,12 +285,12 @@ export default function Home() {
 
       {/* Interactive pipeline */}
       <section id="pipeline" className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="reveal mb-8 max-w-2xl">
-          <p className="text-sm font-semibold text-brand-600">See it route</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Every message takes the right path.</h2>
-          <p className="mt-4 text-slate-600">
-            Pick a conversation and watch it travel the agent graph — including the moments a rule overrides the model and a human takes over.
-          </p>
+        <div className="mb-8">
+          <SectionIntro
+            eyebrow="See it route"
+            title="Every message takes the right path."
+            body="Pick a conversation and watch it travel the agent graph — including the moments a rule overrides the model and a human takes over."
+          />
         </div>
         <div className="reveal">
           <PipelineSimulator />
@@ -317,68 +298,129 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section className="border-y border-slate-200 bg-slate-50">
+      <section id="features" className="border-y border-slate-200 bg-slate-50">
         <div className="mx-auto max-w-6xl px-6 py-24">
-          <h2 className="reveal max-w-2xl text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Everything a support team needs on day one.</h2>
-          <p className="reveal mt-3 max-w-2xl text-slate-600">
-            <LockKeyhole className="mr-1 inline h-4 w-4 text-brand-600" />
-            Order details are only shared with the verified owner, and Relay never asks for passwords, card numbers or 2FA codes.
-          </p>
-          <div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+          <SectionIntro
+            eyebrow="Features"
+            title="Everything a support team needs on day one."
+            body={
+              <>
+                <LockKeyhole className="mr-1 inline h-4 w-4 text-brand-600" />
+                Order details are only shared with the verified owner, and Relay never asks for passwords, card numbers or 2FA codes.
+              </>
+            }
+          />
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map(({ icon: Icon, title, body }, i) => (
               <div key={title} className="reveal" style={stagger(i % 3)}>
-                <Icon className="h-5 w-5 text-brand-600" />
-                <h3 className="mt-3 font-semibold text-slate-900">{title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{body}</p>
+                <div className="group h-full rounded-2xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-xl hover:shadow-brand-900/5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100 transition-all duration-300 group-hover:scale-110 group-hover:bg-brand-600 group-hover:text-white group-hover:ring-brand-600">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 font-semibold text-slate-900">{title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{body}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* Console tour */}
+      <section id="tour" className="mx-auto max-w-6xl px-6 py-24">
+        <div className="mb-12">
+          <SectionIntro
+            eyebrow="For the humans in the loop"
+            title="A console your specialists will actually like."
+            body="When Relay hands off, the ticket arrives with the history, the policy and a suggested reply. Your team approves, edits and teaches — the AI gets better every week."
+          />
+        </div>
+        <ConsoleShowcase />
+      </section>
+
+      {/* ROI */}
+      <section id="roi" className="relative overflow-hidden border-y border-slate-200 bg-slate-50">
+        <div aria-hidden className="pointer-events-none absolute -left-40 top-10 h-96 w-96 rounded-full bg-brand-200/40 blur-3xl" />
+        <div className="relative mx-auto max-w-6xl px-6 py-24">
+          <div className="mb-12">
+            <SectionIntro
+              eyebrow="ROI calculator"
+              title="See what automation is worth to you."
+              body="Move the sliders to match your team. The same formula powers the savings card in Relay's Analytics, using your real conversations."
+            />
+          </div>
+          <div className="reveal">
+            <RoiCalculator />
+          </div>
+        </div>
+      </section>
+
+      {/* Security */}
+      <section id="security" className="mx-auto max-w-6xl px-6 py-24">
+        <div className="mb-12">
+          <SectionIntro
+            eyebrow="Security & privacy"
+            title="Safe by construction, not by prompt."
+            body="The riskiest decisions are made by code you can read, not by a model's judgement. Sensitive data is stripped before anything is stored or sent."
+          />
+        </div>
+        <div className="grid items-start gap-8 lg:grid-cols-[1.1fr_1fr]">
+          <div className="reveal lg:sticky lg:top-24">
+            <RedactionDemo />
+          </div>
+          <ul className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
+            {SAFEGUARDS.map(({ icon: Icon, title, body }, i) => (
+              <li key={title} className="reveal" style={stagger(i % 2)}>
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                  <Icon className="h-4.5 w-4.5" aria-hidden />
+                </span>
+                <h3 className="mt-3 font-semibold text-slate-900">{title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">{body}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* Install */}
+      <section id="install" className="border-y border-slate-200 bg-slate-50">
+        <div className="mx-auto max-w-6xl px-6 py-24">
+          <div className="mb-12">
+            <SectionIntro
+              eyebrow="Go live"
+              title="Live on your site in an afternoon."
+              body="No SDK, no rebuild. Paste one tag, point Relay at your help center, and set the rules it has to follow."
+            />
+          </div>
+          <InstallSteps />
+        </div>
+      </section>
+
       {/* Pricing */}
       <section id="pricing" className="mx-auto max-w-6xl px-6 py-24">
-        <div className="reveal text-center">
-          <h2 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Simple, predictable pricing</h2>
-          <p className="mt-3 text-slate-600">Start free with the offline engine. Upgrade when you connect a model.</p>
-        </div>
-        <div className="mt-12 grid gap-4 lg:grid-cols-3">
-          {PLANS.map((p, i) => (
-            <div
-              key={p.name}
-              style={stagger(i)}
-              className={
-                p.featured
-                  ? "reveal border-beam relative rounded-2xl bg-ink-950 p-7 text-white shadow-xl shadow-brand-500/20 ring-1 ring-brand-500/40"
-                  : "reveal rounded-2xl border border-slate-200 bg-white p-7"
-              }
-            >
-              {p.featured && <span className="absolute -top-3 left-7 rounded-full bg-brand-500 px-2.5 py-0.5 text-xs font-medium">Most popular</span>}
-              <h3 className="font-semibold">{p.name}</h3>
-              <p className={p.featured ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>{p.body}</p>
-              <div className="mt-5 flex items-baseline gap-1">
-                <span className="text-4xl font-semibold tracking-tight">{p.price}</span>
-                <span className={p.featured ? "text-sm text-slate-400" : "text-sm text-slate-500"}>{p.period}</span>
-              </div>
-              <ul className="mt-6 space-y-2.5 text-sm">
-                {p.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2">
-                    <Check className={p.featured ? "h-4 w-4 text-brand-300" : "h-4 w-4 text-brand-600"} /> {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href={p.href}
-                className={
-                  p.featured
-                    ? "mt-7 block rounded-lg bg-brand-500 py-2.5 text-center text-sm font-medium hover:bg-brand-400"
-                    : "mt-7 block rounded-lg border border-slate-200 py-2.5 text-center text-sm font-medium text-slate-900 hover:bg-slate-50"
-                }
-              >
-                {p.cta}
-              </Link>
-            </div>
-          ))}
+        <SectionIntro
+          center
+          eyebrow="Pricing"
+          title="Simple, predictable pricing"
+          body="Start free with the offline engine. Upgrade when you connect a model."
+        />
+        <PricingPlans />
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="mx-auto max-w-6xl px-6 pb-24">
+        <div className="grid gap-10 lg:grid-cols-[1fr_1.6fr]">
+          <div className="reveal">
+            <p className="text-sm font-semibold text-brand-600">FAQ</p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Questions, answered.</h2>
+            <p className="mt-4 text-slate-600">Still curious? Ask Relay itself — the assistant in the corner runs on the same engine.</p>
+            <Link href="/demo" className="group mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700">
+              Or explore the full demo <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </Link>
+          </div>
+          <div className="reveal">
+            <Faq />
+          </div>
         </div>
       </section>
 
@@ -397,10 +439,51 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-slate-200">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 text-sm text-slate-500 sm:flex-row">
-          <Logo />
-          <p>© {new Date().getFullYear()} Relay. Demo data for the fictional retailer Aurora Outfitters.</p>
+      <footer className="border-t border-slate-200 bg-slate-50">
+        <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr]">
+          <div>
+            <Logo />
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-slate-500">
+              Agentic customer support that resolves what it can and hands off the rest — with a full briefing.
+            </p>
+          </div>
+          <nav aria-label="Product">
+            <p className="text-sm font-semibold text-slate-900">Product</p>
+            <ul className="mt-3 space-y-2 text-sm">
+              {NAV.map(({ href, label }) => (
+                <li key={href}>
+                  <Link href={href} className="text-slate-500 transition-colors hover:text-slate-900">
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <nav aria-label="On this page">
+            <p className="text-sm font-semibold text-slate-900">On this page</p>
+            <ul className="mt-3 space-y-2 text-sm">
+              {EXPLORE.map(({ href, label }) => (
+                <li key={href}>
+                  <a href={href} className="text-slate-500 transition-colors hover:text-slate-900">
+                    {label}
+                  </a>
+                </li>
+              ))}
+              <li>
+                <a href="/widget-demo.html" className="text-slate-500 transition-colors hover:text-slate-900">
+                  Widget on a sample store
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+        <div className="border-t border-slate-200">
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-6 text-sm text-slate-500 sm:flex-row">
+            <p>© {new Date().getFullYear()} Relay. Demo data for the fictional retailer Aurora Outfitters.</p>
+            <a href="#top" className="group inline-flex items-center gap-1.5 hover:text-slate-900">
+              Back to top <ArrowUp className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" aria-hidden />
+            </a>
+          </div>
         </div>
       </footer>
 

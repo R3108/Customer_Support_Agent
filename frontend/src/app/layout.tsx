@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { DEV_HYDRATION_GUARD_SCRIPT } from "@/lib/devHydrationGuard";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     // The boot script toggles the theme class before hydration, hence suppressHydrationWarning.
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
+        {process.env.NODE_ENV === "development" && <script dangerouslySetInnerHTML={{ __html: DEV_HYDRATION_GUARD_SCRIPT }} />}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col font-sans">{children}</body>

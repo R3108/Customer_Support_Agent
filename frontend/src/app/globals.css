@@ -373,24 +373,6 @@ dialog.app-dialog[open] > * {
   content: counter(count);
 }
 
-/* Agent route chips light up in sequence, like a request travelling through the graph. */
-@keyframes route-pulse {
-  0%,
-  28%,
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-  10% {
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, currentColor 55%, transparent),
-      0 0 18px -2px color-mix(in oklab, currentColor 70%, transparent);
-  }
-}
-.route-step {
-  animation: route-pulse 3.2s ease-in-out infinite;
-  animation-delay: calc(var(--i, 0) * 0.4s);
-}
-
 /* Light sweep across a button on hover. */
 .btn-shine {
   position: relative;
@@ -642,6 +624,387 @@ html {
   animation: pipeline-ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
+/* ------------------------------------------------------------------ landing sections (components/landing) */
+
+/* Hero: notification card that bobs gently. Uses `translate` so it composes with .tilt-depth's transform. */
+@keyframes float-y {
+  50% {
+    translate: 0 -8px;
+  }
+}
+.float-y {
+  animation: float-y 5s ease-in-out infinite;
+}
+
+/* HeroPreview: reply words stream in one after another (--w is the word index), like a model generating.
+ * Opacity and translate only, so it stays on the compositor inside the tilted, backdrop-blurred card. */
+@keyframes stream-word {
+  from {
+    opacity: 0;
+    translate: 0 3px;
+  }
+}
+.stream-word {
+  animation: stream-word 0.35s ease-out both;
+  animation-delay: calc(var(--w, 0) * 42ms);
+}
+.composer-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--color-brand-600);
+  animation: caret-blink 0.9s steps(1) infinite;
+}
+/* The route hop that just lit up flashes once. */
+@keyframes route-live {
+  from {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, currentColor 60%, transparent),
+      0 0 18px -2px color-mix(in oklab, currentColor 80%, transparent);
+    scale: 1.08;
+  }
+}
+.route-live {
+  animation: route-live 0.7s ease-out;
+}
+/* The cancel scenario's "Yes" button gets pressed, as if the customer confirmed. */
+.hero-confirm {
+  display: inline-block;
+  animation: approve-press 0.35s ease-out 1.2s;
+}
+
+/* QuestionMarquee: each row holds two identical tracks; shifting one track width loops seamlessly. */
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+}
+.marquee {
+  display: flex;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+.marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.75rem;
+  min-width: max-content;
+  padding-block: 4px;
+  animation: marquee var(--marquee-duration, 50s) linear infinite var(--marquee-dir, normal);
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  to {
+    translate: calc(-100% - 0.75rem) 0;
+  }
+}
+
+/* ConsoleShowcase: tab descriptions expand smoothly, the active tab's timer bar drives autoplay. */
+.showcase-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.showcase-body.is-open {
+  grid-template-rows: 1fr;
+}
+@keyframes tab-progress {
+  from {
+    scale: 0 1;
+  }
+}
+.tab-progress {
+  transform-origin: 0 50%;
+  animation: tab-progress 6.5s linear both;
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+    scale: 0.985;
+  }
+}
+.showcase-panel {
+  animation: panel-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Approvals mock: a cursor glides to "Approve", clicks, and the refund confirmation appears. */
+@keyframes demo-cursor {
+  0%,
+  45% {
+    opacity: 0;
+    translate: 140px 46px;
+  }
+  55% {
+    opacity: 1;
+  }
+  75% {
+    translate: 0 0;
+    scale: 1;
+  }
+  80% {
+    scale: 0.85;
+  }
+  86% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 0;
+  }
+}
+.demo-cursor {
+  opacity: 0;
+  animation: demo-cursor 2.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes approve-press {
+  50% {
+    scale: 0.94;
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-brand-500) 25%, transparent);
+  }
+}
+.approve-btn {
+  animation: approve-press 0.3s ease-out 2.05s;
+}
+@keyframes approve-done {
+  from {
+    opacity: 0;
+    translate: -6px 0;
+  }
+}
+.approve-done {
+  animation: approve-done 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) 2.3s both;
+}
+
+/* Copilot mock: "Friendlier" is picked and the draft cross-fades to the rewrite. */
+@keyframes copilot-pick {
+  to {
+    background: var(--color-brand-600);
+    color: #fff;
+    box-shadow: 0 0 0 1px var(--color-brand-600);
+  }
+}
+.copilot-pick {
+  animation:
+    bubble-in 0.22s ease-out 0.2s both,
+    copilot-pick 0.25s ease-out 1.3s forwards;
+}
+@keyframes fade-out-blur {
+  to {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+.copilot-before {
+  animation: fade-out-blur 0.4s ease-in 1.6s forwards;
+}
+.copilot-after {
+  animation: fade-in-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 1.9s both;
+}
+
+/* RoiCalculator sliders: a filled track up to the thumb (--fill set inline). */
+.range {
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, var(--color-brand-500) var(--fill, 50%), var(--color-slate-200) var(--fill, 50%));
+  cursor: pointer;
+}
+.range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 2px solid var(--color-brand-500);
+  box-shadow: 0 2px 8px rgb(15 23 42 / 0.18);
+  transition: scale 0.15s;
+}
+.range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 2px solid var(--color-brand-500);
+  box-shadow: 0 2px 8px rgb(15 23 42 / 0.18);
+  transition: scale 0.15s;
+}
+.range:hover::-webkit-slider-thumb,
+.range:active::-webkit-slider-thumb {
+  scale: 1.15;
+}
+.range:hover::-moz-range-thumb,
+.range:active::-moz-range-thumb {
+  scale: 1.15;
+}
+
+/* InstallSteps: the snippet types itself out once visible, then a caret blinks. */
+.typewriter {
+  display: inline-block;
+  vertical-align: bottom;
+  clip-path: inset(0 100% 0 0);
+}
+.typewriter.is-typing {
+  animation: typewriter 1.5s steps(var(--chars, 60)) 0.2s forwards;
+}
+@keyframes typewriter {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.15em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--color-brand-300);
+  opacity: 0;
+}
+.caret.is-typing {
+  animation: caret-blink 1s steps(1) 1.7s infinite;
+}
+@keyframes caret-blink {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* InstallSteps: the connector between steps draws itself as the list scrolls through view. */
+@keyframes draw-down {
+  from {
+    scale: 1 0;
+  }
+}
+@supports (animation-timeline: view()) {
+  .step-line {
+    transform-origin: 50% 0;
+    animation: draw-down linear both;
+    animation-timeline: view();
+    animation-range: entry 30% cover 55%;
+  }
+}
+
+/* RedactionDemo: a 7s loop — scan, mask the card number, show the notice and the protected destinations. */
+.redact-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 30%,
+    color-mix(in oklab, #34d399 22%, transparent) 46%,
+    color-mix(in oklab, #34d399 55%, transparent) 50%,
+    transparent 52%
+  );
+  translate: -100% 0;
+  animation: redact-scan 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes redact-scan {
+  0%,
+  8% {
+    translate: -100% 0;
+  }
+  40%,
+  100% {
+    translate: 100% 0;
+  }
+}
+.redact-original {
+  animation: redact-original 7s ease-in-out infinite;
+}
+@keyframes redact-original {
+  0%,
+  26%,
+  100% {
+    opacity: 1;
+    filter: none;
+  }
+  32%,
+  94% {
+    opacity: 0;
+    filter: blur(5px);
+  }
+}
+.redact-masked {
+  animation: redact-masked 7s ease-in-out infinite;
+}
+@keyframes redact-masked {
+  0%,
+  28%,
+  98%,
+  100% {
+    opacity: 0;
+    scale: 0.92;
+  }
+  34%,
+  92% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+.redact-notice {
+  animation: redact-notice 7s ease-in-out infinite;
+}
+@keyframes redact-notice {
+  0%,
+  38%,
+  100% {
+    opacity: 0.25;
+    translate: 0 4px;
+  }
+  46%,
+  92% {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+.redact-dest {
+  animation: redact-dest 7s ease-in-out infinite;
+}
+@keyframes redact-dest {
+  0%,
+  46%,
+  100% {
+    opacity: 0.45;
+  }
+  54%,
+  92% {
+    opacity: 1;
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, #34d399 35%, transparent);
+  }
+}
+
+/* Faq: native <details> that animates its height where ::details-content is supported. */
+.faq {
+  interpolate-size: allow-keywords;
+}
+.faq::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition:
+    block-size 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
+    content-visibility 0.35s allow-discrete;
+}
+.faq[open]::details-content {
+  block-size: auto;
+}
+.faq[open] > p {
+  animation: fade-in-up 0.4s ease-out both;
+}
+
 /* Analytics: bars grow in on load and glide to new values on live updates; changed stats briefly glow. */
 @keyframes grow-x {
   from {
@@ -783,11 +1146,62 @@ html.vt-theme::view-transition-new(root) {
   .aurora-b,
   .animate-text-sweep,
   .count-up,
-  .route-step,
   .border-beam::before,
   .grid-floor::before,
-  .orbit-plane {
+  .orbit-plane,
+  .float-y,
+  .stream-word,
+  .composer-caret,
+  .route-live,
+  .hero-confirm,
+  .marquee-track,
+  .tab-progress,
+  .showcase-panel,
+  .demo-cursor,
+  .approve-btn,
+  .approve-done,
+  .copilot-pick,
+  .copilot-before,
+  .copilot-after,
+  .typewriter.is-typing,
+  .caret.is-typing,
+  .step-line,
+  .redact-scan,
+  .redact-original,
+  .redact-masked,
+  .redact-notice,
+  .redact-dest,
+  .faq[open] > p {
     animation: none;
+  }
+  /* Show each looping or one-shot demo in its final state. */
+  .copilot-pick {
+    background: var(--color-brand-600);
+    color: #fff;
+  }
+  .copilot-before,
+  .redact-original,
+  .redact-scan {
+    opacity: 0;
+  }
+  .typewriter {
+    clip-path: none;
+  }
+  .marquee {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .marquee-track {
+    flex-wrap: wrap;
+    justify-content: center;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+  .marquee-track[aria-hidden] {
+    display: none;
+  }
+  .faq::details-content {
+    transition: none;
   }
   .tilt {
     transform: none;

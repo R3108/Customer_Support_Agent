@@ -1,7 +1,9 @@
 "use client";
 
 import { BookOpen, Brain, CheckCircle2, Headset, MessageSquareText, Pause, Play, User, Zap } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useInView } from "@/hooks/useInView";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { cx } from "@/lib/format";
 
 type NodeId = "customer" | "intent" | "retrieve" | "support" | "reply" | "action" | "escalate";
@@ -102,38 +104,21 @@ const TONES: Record<Tone, { stroke: string; node: string; text: string; badge: s
 
 const edgeKey = (a: NodeId, b: NodeId) => `${a}-${b}`;
 
-function subscribeReducedMotion(cb: () => void) {
-  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-  mq.addEventListener("change", cb);
-  return () => mq.removeEventListener("change", cb);
-}
-const useReducedMotion = () =>
-  useSyncExternalStore(subscribeReducedMotion, () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => false);
-
 /**
  * Interactive diagram of a message travelling through Relay's agent graph. Autoplays through the scenarios
  * while on screen; picking one pauses autoplay. With reduced motion, each scenario shows its final state.
  */
 export function PipelineSimulator() {
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [rootRef, visible] = useInView();
   const [index, setIndex] = useState(0);
   const [step, setStep] = useState(0);
   const [auto, setAuto] = useState(true);
-  const [visible, setVisible] = useState(false);
   const reduced = useReducedMotion();
 
   const scenario = SCENARIOS[index];
   const last = scenario.path.length - 1;
   const shown = reduced ? last : step;
   const tone = TONES[scenario.tone];
-
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.35 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
 
   // Advance one hop at a time; after a pause on the outcome, autoplay moves to the next scenario.
   useEffect(() => {
